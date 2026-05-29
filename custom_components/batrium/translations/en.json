@@ -1,0 +1,17 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Batrium BMS",
+        "description": "The WatchMon supervisor broadcasts UDP packets on port 18542. No additional configuration is needed unless you changed the port.",
+        "data": {
+          "name": "Integration Name",
+          "udp_port": "UDP Listen Port"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This Batrium instance is already configured."
+    }
+  }
+}

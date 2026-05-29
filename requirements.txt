@@ -1,0 +1,5 @@
+colorlog
+homeassistant
+ruff
+aioesphomeapi
+victron_mqtt
