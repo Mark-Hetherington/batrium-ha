@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+sudo mkdir -p /config
+sudo chown vscode:vscode /config
+
+# go2rtc is required by HA's default_config in Docker environments but is not
+# in Debian repos — download the official release binary directly.
+ARCH=$(dpkg --print-architecture)
+curl -fsSL "https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_${ARCH}" \
+    | sudo install -m 755 /dev/stdin /usr/local/bin/go2rtc
+
+python3 -m pip install --requirement requirements_dev.txt

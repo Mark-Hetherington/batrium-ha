@@ -18,7 +18,8 @@ def rapid_packet_hex():
 
     Then replace the placeholder below with the real capture.
     """
-    # Header:  0x3A, msg_type=0x3E5A (LE), 0x2C, system_id=0x0001 (LE), hub_id=0x0000 (LE)
+    # Header: 0x3A, msg_type=0x3E5A (LE), 0x2C,
+    #         system_id=0x0001 (LE), hub_id=0x0000 (LE)
     # Payload: 48 bytes of zeros (all readings = 0 / -40°C temps)
     header = "3a5a3e2c01000000"
     payload = "00" * 48
