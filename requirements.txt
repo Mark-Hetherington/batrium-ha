@@ -1,5 +1,2 @@
-colorlog
-homeassistant
-ruff
-aioesphomeapi
-victron_mqtt
+homeassistant==2026.5.4
+ruff==0.15.7
