@@ -20,11 +20,22 @@ from .const import (
     MSG_COMMS_STATUS,
     MSG_COMMS_STATUS_FULL,
     MSG_COMMS_STATUS_V1,
+    MSG_CELL_GROUP_SETUP_V4,
+    MSG_CELL_GROUP_SETUP_V5,
+    MSG_CELL_GROUP_SETUP_V6,
+    MSG_CHARGE_SETUP,
+    MSG_CRITICAL_SETUP,
     MSG_DAILY_SESSION,
     MSG_DAILY_SESSION_FULL,
+    MSG_DISCHARGE_SETUP,
+    MSG_EXPANSION_SETUP_V3,
+    MSG_EXPANSION_SETUP_V4,
     MSG_HW_SHUNT_METRIC,
     MSG_HW_SYSTEM_SETUP_FULL,
+    MSG_HW_SYSTEM_SETUP_V4,
+    MSG_HW_SYSTEM_SETUP_V5,
     MSG_INTEGRATION_SETUP_FULL,
+    MSG_INTEGRATION_SETUP_V4,
     MSG_LEGACY_CELL_FULL,
     MSG_LEGACY_DISCO,
     MSG_LEGACY_FAST,
@@ -37,18 +48,25 @@ from .const import (
     MSG_LIVE_DISPLAY,
     MSG_LOGIC_CONTROL,
     MSG_NETWORK_SETUP,
+    MSG_REMOTE_SETUP,
     MSG_REMOTE_SETUP_FULL,
     MSG_REMOTE_STATUS,
     MSG_SESSION_METRICS,
     MSG_SHUNT_METRIC,
+    MSG_SHUNT_SETUP,
+    MSG_SHUNT_SETUP_V3,
+    MSG_SHUNT_SETUP_V4,
     MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
     MSG_STATUS_RAPID,
+    MSG_STATUS_SLOW_V2,
+    MSG_STATUS_SLOW_V3,
     MSG_SYSTEM_DISCO,
     MSG_SYSTEM_SETUP,
     MSG_TELEMETRY_FAST,
     MSG_TELEMETRY_RAPID,
     MSG_TELEMETRY_SLOW,
+    MSG_THERMAL_SETUP,
     MSG_THERMAL_SETUP_FULL,
     OFFSET_MSG_TYPE,
     OFFSET_PAYLOAD,
@@ -1153,6 +1171,180 @@ def _parse_status_control_logic(p: bytes) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Tier-4 setup / older-variant parsers
+# ---------------------------------------------------------------------------
+
+
+def _parse_slow_v2(p: bytes) -> dict:
+    """0x4032 - Status Slow v2 (66 bytes, 30 s). Duration estimates + setup versions."""
+    o = OFFSET_PAYLOAD
+    return {
+        "estimated_duration_to_full_min": struct.unpack_from("<h", p, o + 20)[0],   # offset 28
+        "estimated_duration_to_empty_min": struct.unpack_from("<h", p, o + 22)[0],  # offset 30
+        "shunt_accum_avg_charge_a": struct.unpack_from("<f", p, o + 24)[0] / 1000.0,  # offset 32
+        "shunt_accum_avg_dischg_a": struct.unpack_from("<f", p, o + 28)[0] / 1000.0,  # offset 36
+        "has_shunt_soc_count_lo": bool(p[o + 36]),  # offset 44
+        "has_shunt_soc_count_hi": bool(p[o + 37]),  # offset 45
+    }
+
+
+def _parse_slow_v3(p: bytes) -> dict:
+    """0x4033 - Status Slow v3 (66 bytes, 30 s). Session records + shunt serial info."""
+    o = OFFSET_PAYLOAD
+    return {
+        "daily_session_num_records": struct.unpack_from("<h", p, o + 4)[0],    # offset 12
+        "daily_session_max_records": struct.unpack_from("<h", p, o + 6)[0],    # offset 14
+        "quick_session_num_records": struct.unpack_from("<h", p, o + 12)[0],   # offset 20
+        "quick_session_max_records": struct.unpack_from("<h", p, o + 14)[0],   # offset 22
+        "quick_session_interval_s": struct.unpack_from("<I", p, o + 8)[0] / 1000.0,  # offset 16
+        "shunt_setup_nom_capacity_ah": struct.unpack_from("<f", p, o + 18)[0] / 1000.0,  # offset 26
+    }
+
+
+def _parse_hw_system_setup_v4(p: bytes) -> dict:
+    """0x4A34/0x4A35 - HW System Setup v4/v5 (74/76 bytes, 30 s). Identity + quick session."""
+    o = OFFSET_PAYLOAD
+    sys_code = p[o + 2: o + 10].rstrip(b"\x00").decode("ascii", errors="replace")   # offset 10
+    sys_name = p[o + 10: o + 30].rstrip(b"\x00").decode("ascii", errors="replace")  # offset 18
+    asset_code = p[o + 30: o + 50].rstrip(b"\x00").decode("ascii", errors="replace")  # offset 38
+    return {
+        "system_code": sys_code,
+        "system_name": sys_name,
+        "asset_code": asset_code,
+        "quick_session_enabled": bool(p[o + 51]),                                   # offset 59
+        "quick_session_interval_s": struct.unpack_from("<I", p, o + 52)[0] / 1000.0,  # offset 60
+        "firmware_version": struct.unpack_from("<h", p, o + 58)[0],                # offset 66
+        "hardware_version": struct.unpack_from("<h", p, o + 60)[0],                # offset 68
+        "serial_number": struct.unpack_from("<I", p, o + 62)[0],                   # offset 70
+    }
+
+
+def _parse_cellgroup_setup(p: bytes) -> dict:
+    """0x4B34/35/36 - HW Cell Group Setup (51/53/55 bytes, 30 s). Voltage/temp thresholds."""
+    o = OFFSET_PAYLOAD
+    return {
+        "cell_setup_first_id": p[o + 2],                                           # offset 10
+        "cell_setup_last_id": p[o + 3],                                            # offset 11
+        "cell_setup_nom_cell_volt_mv": struct.unpack_from("<h", p, o + 4)[0],      # offset 12
+        "cell_setup_lo_cell_volt_mv": struct.unpack_from("<h", p, o + 6)[0],       # offset 14
+        "cell_setup_hi_cell_volt_mv": struct.unpack_from("<h", p, o + 8)[0],       # offset 16
+        "cell_setup_bypass_volt_mv": struct.unpack_from("<h", p, o + 10)[0],       # offset 18
+        "cell_setup_bypass_amp_limit_ma": struct.unpack_from("<h", p, o + 12)[0],  # offset 20
+        "cell_setup_bypass_temp_limit_c": _decode_temp(p[o + 14]),                 # offset 22
+        "cell_setup_lo_cell_temp_c": _decode_temp(p[o + 15]),                      # offset 23
+        "cell_setup_hi_cell_temp_c": _decode_temp(p[o + 16]),                      # offset 24
+        "cell_setup_nom_cells_in_series": p[o + 18],                               # offset 26
+    }
+
+
+def _parse_shunt_setup(p: bytes) -> dict:
+    """0x4C33/4C34/4C58 - HW Shunt Setup (46–68 bytes, 30 s). Nominal capacity + config."""
+    o = OFFSET_PAYLOAD
+    return {
+        "shunt_setup_type": p[o + 0],                                              # offset 8
+        "shunt_setup_nom_capacity_ah": struct.unpack_from("<f", p, o + 16)[0],     # offset 24
+        "shunt_setup_reverse_flow": bool(p[o + 36]),                               # offset 44
+    }
+
+
+def _parse_expansion_setup(p: bytes) -> dict:
+    """0x4D33/4D34 - HW Expansion Setup (32 bytes, 30 s). Relay mode assignments."""
+    o = OFFSET_PAYLOAD
+    return {
+        "expansion_setup_template": p[o + 1],   # offset 9
+        "expansion_setup_relay1": p[o + 3],     # offset 11
+        "expansion_setup_relay2": p[o + 4],     # offset 12
+        "expansion_setup_relay3": p[o + 5],     # offset 13
+        "expansion_setup_relay4": p[o + 6],     # offset 14
+    }
+
+
+def _parse_remote_setup(p: bytes) -> dict:
+    """0x4E58 - Control Remote Setup (45 bytes, 30 s). Charge/discharge target voltages."""
+    o = OFFSET_PAYLOAD
+    return {
+        "remote_charge_target_norm_volt": struct.unpack_from("<h", p, o + 0)[0],   # offset 8
+        "remote_charge_target_norm_amp": struct.unpack_from("<h", p, o + 2)[0],    # offset 10
+        "remote_charge_target_limp_volt": struct.unpack_from("<h", p, o + 6)[0],   # offset 14
+        "remote_charge_target_limp_amp": struct.unpack_from("<h", p, o + 8)[0],    # offset 16
+        "remote_dischg_target_norm_volt": struct.unpack_from("<h", p, o + 18)[0],  # offset 26
+        "remote_dischg_target_norm_amp": struct.unpack_from("<h", p, o + 20)[0],   # offset 28
+        "remote_dischg_target_limp_volt": struct.unpack_from("<h", p, o + 24)[0],  # offset 32
+        "remote_dischg_target_limp_amp": struct.unpack_from("<h", p, o + 26)[0],   # offset 34
+    }
+
+
+def _parse_critical_setup(p: bytes) -> dict:
+    """0x4F33 - Control Critical Setup (75 bytes, 30 s). Protection thresholds."""
+    o = OFFSET_PAYLOAD
+    return {
+        "critical_setup_cell_volt_lo_mv": struct.unpack_from("<h", p, o + 5)[0],      # offset 13
+        "critical_setup_cell_volt_hi_mv": struct.unpack_from("<h", p, o + 7)[0],      # offset 15
+        "critical_setup_cell_temp_lo_c": _decode_temp(p[o + 11]),                     # offset 19
+        "critical_setup_cell_temp_hi_c": _decode_temp(p[o + 12]),                     # offset 20
+        "critical_setup_supply_volt_lo_mv": struct.unpack_from("<h", p, o + 15)[0],   # offset 23
+        "critical_setup_supply_volt_hi_mv": struct.unpack_from("<h", p, o + 17)[0],   # offset 25
+        "critical_setup_shunt_peak_charge_a": struct.unpack_from("<h", p, o + 33)[0] / 100.0,  # offset 41
+        "critical_setup_shunt_peak_dischg_a": struct.unpack_from("<h", p, o + 38)[0] / 100.0,  # offset 46
+    }
+
+
+def _parse_charge_setup(p: bytes) -> dict:
+    """0x5033 - Control Charge Setup (60 bytes, 30 s). Charge control thresholds."""
+    o = OFFSET_PAYLOAD
+    return {
+        "charge_setup_cell_volt_hi_mv": struct.unpack_from("<h", p, o + 22)[0],      # offset 30
+        "charge_setup_cell_volt_resume_mv": struct.unpack_from("<h", p, o + 24)[0],  # offset 32
+        "charge_setup_shunt_soc_hi_pct": _decode_soc(p[o + 36]),                     # offset 44
+        "charge_setup_shunt_soc_resume_pct": _decode_soc(p[o + 37]),                 # offset 45
+    }
+
+
+def _parse_discharge_setup(p: bytes) -> dict:
+    """0x5158 - Control Discharge Setup (49 bytes, 30 s). Discharge control thresholds."""
+    o = OFFSET_PAYLOAD
+    return {
+        "discharge_setup_cell_volt_lo_mv": struct.unpack_from("<h", p, o + 16)[0],      # offset 24
+        "discharge_setup_cell_volt_resume_mv": struct.unpack_from("<h", p, o + 18)[0],  # offset 26
+        "discharge_setup_shunt_soc_lo_pct": _decode_soc(p[o + 30]),                     # offset 38
+        "discharge_setup_shunt_soc_resume_pct": _decode_soc(p[o + 31]),                 # offset 39
+    }
+
+
+def _parse_thermal_setup(p: bytes) -> dict:
+    """0x5258 - Control Thermal Setup (36 bytes, 30 s). Heat/cool thresholds (older format)."""
+    o = OFFSET_PAYLOAD
+    return {
+        "thermal_heat_mode": p[o + 0],                        # offset 8
+        "thermal_heat_monitor_cell_temp": bool(p[o + 1]),     # offset 9
+        "thermal_heat_monitor_ambient": bool(p[o + 2]),       # offset 10
+        "thermal_heat_lo_cell_temp_c": _decode_temp(p[o + 3]),  # offset 11
+        "thermal_heat_lo_ambient_c": _decode_temp(p[o + 4]),    # offset 12
+        "thermal_cool_mode": p[o + 13],                       # offset 21
+        "thermal_cool_monitor_cell_temp": bool(p[o + 14]),    # offset 22
+        "thermal_cool_monitor_ambient": bool(p[o + 15]),      # offset 23
+        "thermal_cool_monitor_bypass": bool(p[o + 16]),       # offset 24
+        "thermal_cool_hi_cell_temp_c": _decode_temp(p[o + 17]),  # offset 25
+        "thermal_cool_hi_ambient_c": _decode_temp(p[o + 18]),    # offset 26
+    }
+
+
+def _parse_integration_setup(p: bytes) -> dict:
+    """0x5334 - HW Integration Setup v4 (26 bytes, 30 s). Bus config without MQTT."""
+    o = OFFSET_PAYLOAD
+    return {
+        "integration_usb_broadcast_enabled": bool(p[o + 1]),                          # offset 9
+        "integration_wifi_broadcast_enabled": bool(p[o + 2]),                         # offset 10
+        "integration_wifi_broadcast_mode": p[o + 3],                                  # offset 11
+        "integration_canbus_broadcast_enabled": bool(p[o + 4]),                       # offset 12
+        "integration_canbus_mode": p[o + 5],                                          # offset 13
+        "integration_canbus_remote_addr": struct.unpack_from("<I", p, o + 6)[0],      # offset 14
+        "integration_canbus_base_addr": struct.unpack_from("<I", p, o + 10)[0],       # offset 18
+        "integration_canbus_group_addr": struct.unpack_from("<I", p, o + 14)[0],      # offset 22
+    }
+
+
+# ---------------------------------------------------------------------------
 # Dispatch table and packet entry point
 # ---------------------------------------------------------------------------
 
@@ -1171,9 +1363,27 @@ _DISPATCH: dict[int, Any] = {
     MSG_STATUS_CONTROL_LOGIC: _parse_status_control_logic,
     MSG_REMOTE_STATUS: _parse_remote_status,
     MSG_LEGACY_REMOTE: _parse_remote_status,
+    MSG_STATUS_SLOW_V2: _parse_slow_v2,
+    MSG_STATUS_SLOW_V3: _parse_slow_v3,
     MSG_TELEMETRY_SLOW: _parse_slow,
     MSG_SYSTEM_SETUP: _parse_system_setup,
+    MSG_HW_SYSTEM_SETUP_V4: _parse_hw_system_setup_v4,
+    MSG_HW_SYSTEM_SETUP_V5: _parse_hw_system_setup_v4,
     MSG_HW_SYSTEM_SETUP_FULL: _parse_hw_system_setup_full,
+    MSG_CELL_GROUP_SETUP_V4: _parse_cellgroup_setup,
+    MSG_CELL_GROUP_SETUP_V5: _parse_cellgroup_setup,
+    MSG_CELL_GROUP_SETUP_V6: _parse_cellgroup_setup,
+    MSG_SHUNT_SETUP: _parse_shunt_setup,
+    MSG_SHUNT_SETUP_V3: _parse_shunt_setup,
+    MSG_SHUNT_SETUP_V4: _parse_shunt_setup,
+    MSG_EXPANSION_SETUP_V3: _parse_expansion_setup,
+    MSG_EXPANSION_SETUP_V4: _parse_expansion_setup,
+    MSG_REMOTE_SETUP: _parse_remote_setup,
+    MSG_CRITICAL_SETUP: _parse_critical_setup,
+    MSG_CHARGE_SETUP: _parse_charge_setup,
+    MSG_DISCHARGE_SETUP: _parse_discharge_setup,
+    MSG_THERMAL_SETUP: _parse_thermal_setup,
+    MSG_INTEGRATION_SETUP_V4: _parse_integration_setup,
     MSG_DAILY_SESSION: _parse_daily_session,
     MSG_DAILY_SESSION_FULL: _parse_daily_session_full,
     MSG_NETWORK_SETUP: _parse_network_setup,

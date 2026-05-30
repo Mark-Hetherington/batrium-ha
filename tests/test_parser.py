@@ -5,26 +5,39 @@ import struct
 import pytest
 
 from custom_components.batrium.const import (
+    MSG_CELL_GROUP_SETUP_V6,
     MSG_CELL_STATS,
+    MSG_CHARGE_SETUP,
     MSG_COMMS_STATUS,
     MSG_COMMS_STATUS_FULL,
+    MSG_CRITICAL_SETUP,
     MSG_DAILY_SESSION_FULL,
+    MSG_DISCHARGE_SETUP,
+    MSG_EXPANSION_SETUP_V4,
     MSG_HW_SHUNT_METRIC,
     MSG_HW_SYSTEM_SETUP_FULL,
+    MSG_HW_SYSTEM_SETUP_V4,
+    MSG_HW_SYSTEM_SETUP_V5,
     MSG_INTEGRATION_SETUP_FULL,
+    MSG_INTEGRATION_SETUP_V4,
     MSG_LIFE_METRIC_A,
     MSG_LIFE_METRIC_B,
     MSG_LIFE_METRIC_V3,
     MSG_LIVE_DISPLAY,
     MSG_NETWORK_SETUP,
+    MSG_REMOTE_SETUP,
     MSG_REMOTE_SETUP_FULL,
     MSG_SESSION_METRICS,
+    MSG_SHUNT_SETUP,
     MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
     MSG_STATUS_RAPID,
+    MSG_STATUS_SLOW_V2,
+    MSG_STATUS_SLOW_V3,
     MSG_SYSTEM_DISCO,
     MSG_TELEMETRY_FAST,
     MSG_TELEMETRY_RAPID,
+    MSG_THERMAL_SETUP,
     MSG_THERMAL_SETUP_FULL,
     UDP_START_HEADER,
 )
@@ -853,6 +866,341 @@ def test_session_metrics_parses_record_counts():
     assert pkt.data["quick_session_enabled"] is True
     assert pkt.data["daily_session_num_records"] == 30
     assert pkt.data["daily_session_max_records"] == 365
+
+
+# ---------------------------------------------------------------------------
+# Status Slow v2 (0x4032)
+# ---------------------------------------------------------------------------
+
+
+def test_slow_v2_parses_duration_and_soc_flags():
+    header = make_header(MSG_STATUS_SLOW_V2)
+    payload = bytearray(58)
+    struct.pack_into("<h", payload, 20, 90)   # EstDurationToFullmins = 90
+    struct.pack_into("<h", payload, 22, 45)   # EstDurationToEmptymins = 45
+    struct.pack_into("<f", payload, 24, 12000.0)  # ShuntAcculmAvgCharge = 12 A
+    struct.pack_into("<f", payload, 28, 8000.0)   # ShuntAcculmAvgDischg = 8 A
+    payload[36] = 1  # hasShuntSocCountLo = True
+    payload[37] = 0  # hasShuntSocCountHi = False
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_STATUS_SLOW_V2
+    assert pkt.data["estimated_duration_to_full_min"] == 90
+    assert pkt.data["estimated_duration_to_empty_min"] == 45
+    assert pkt.data["shunt_accum_avg_charge_a"] == pytest.approx(12.0)
+    assert pkt.data["shunt_accum_avg_dischg_a"] == pytest.approx(8.0)
+    assert pkt.data["has_shunt_soc_count_lo"] is True
+    assert pkt.data["has_shunt_soc_count_hi"] is False
+
+
+# ---------------------------------------------------------------------------
+# Status Slow v3 (0x4033)
+# ---------------------------------------------------------------------------
+
+
+def test_slow_v3_parses_session_records():
+    header = make_header(MSG_STATUS_SLOW_V3)
+    payload = bytearray(58)
+    struct.pack_into("<h", payload, 4, 30)   # DailySessNumOfRecords = 30
+    struct.pack_into("<h", payload, 6, 365)  # DailySessMaxNumOfRecords = 365
+    struct.pack_into("<h", payload, 12, 96)  # QuickSessNumOfRecords = 96
+    struct.pack_into("<h", payload, 14, 288) # QuickSessMaxNumOfRecords = 288
+    struct.pack_into("<I", payload, 8, 300_000)  # QuickSessionInterval = 300 s
+    struct.pack_into("<f", payload, 18, 200_000.0)  # NomCapacityToEmpty = 200 Ah
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_STATUS_SLOW_V3
+    assert pkt.data["daily_session_num_records"] == 30
+    assert pkt.data["daily_session_max_records"] == 365
+    assert pkt.data["quick_session_num_records"] == 96
+    assert pkt.data["quick_session_max_records"] == 288
+    assert pkt.data["quick_session_interval_s"] == pytest.approx(300.0)
+    assert pkt.data["shunt_setup_nom_capacity_ah"] == pytest.approx(200.0)
+
+
+# ---------------------------------------------------------------------------
+# HW System Setup v4/v5 (0x4A34 / 0x4A35)
+# ---------------------------------------------------------------------------
+
+
+def test_hw_system_setup_v4_parses_identity():
+    header = make_header(MSG_HW_SYSTEM_SETUP_V4)
+    payload = bytearray(66)
+    payload[2:10] = b"BATT0001"                    # SystemCode at o+2
+    payload[10:30] = b"My Battery Pack\x00\x00\x00\x00\x00"  # SysName at o+10 (20 bytes)
+    payload[51] = 1                                 # AllowQuickSession
+    struct.pack_into("<I", payload, 52, 120_000)   # QuickSessionInterval = 120 s
+    struct.pack_into("<h", payload, 58, 220)        # FirmwareVersion
+    struct.pack_into("<h", payload, 60, 4)          # HardwareVersion
+    struct.pack_into("<I", payload, 62, 123456)     # SerialNo
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_HW_SYSTEM_SETUP_V4
+    assert pkt.data["system_code"] == "BATT0001"
+    assert pkt.data["quick_session_enabled"] is True
+    assert pkt.data["quick_session_interval_s"] == pytest.approx(120.0)
+    assert pkt.data["firmware_version"] == 220
+    assert pkt.data["hardware_version"] == 4
+    assert pkt.data["serial_number"] == 123456
+
+
+def test_hw_system_setup_v5_dispatches_to_same_parser():
+    header = make_header(MSG_HW_SYSTEM_SETUP_V5)
+    payload = bytearray(68)  # 76 bytes total
+    payload[2:10] = b"BATT0002"
+    struct.pack_into("<h", payload, 58, 215)
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_HW_SYSTEM_SETUP_V5
+    assert pkt.data["system_code"] == "BATT0002"
+    assert pkt.data["firmware_version"] == 215
+
+
+# ---------------------------------------------------------------------------
+# Cell Group Setup (0x4B36)
+# ---------------------------------------------------------------------------
+
+
+def test_cellgroup_setup_parses_voltage_thresholds():
+    header = make_header(MSG_CELL_GROUP_SETUP_V6)
+    payload = bytearray(47)
+    payload[2] = 1   # HwCellmonFirstID
+    payload[3] = 16  # HwCellmonLastID
+    struct.pack_into("<h", payload, 4, 3600)   # NomCellVolt = 3600 mV
+    struct.pack_into("<h", payload, 6, 2800)   # LoCellVolt = 2800 mV
+    struct.pack_into("<h", payload, 8, 4200)   # HiCellVolt = 4200 mV
+    struct.pack_into("<h", payload, 10, 4150)  # BypassVoltLevel = 4150 mV
+    struct.pack_into("<h", payload, 12, 500)   # BypassAmpLimit = 500 mA
+    payload[14] = 75  # BypassTempLimit = 75-40 = 35°C
+    payload[15] = 20  # LoCellTemp = 20-40 = -20°C
+    payload[16] = 85  # HiCellTemp = 85-40 = 45°C
+    payload[18] = 16  # NomCellsInSeries
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_CELL_GROUP_SETUP_V6
+    assert pkt.data["cell_setup_first_id"] == 1
+    assert pkt.data["cell_setup_last_id"] == 16
+    assert pkt.data["cell_setup_nom_cell_volt_mv"] == 3600
+    assert pkt.data["cell_setup_lo_cell_volt_mv"] == 2800
+    assert pkt.data["cell_setup_hi_cell_volt_mv"] == 4200
+    assert pkt.data["cell_setup_bypass_volt_mv"] == 4150
+    assert pkt.data["cell_setup_bypass_amp_limit_ma"] == 500
+    assert pkt.data["cell_setup_bypass_temp_limit_c"] == pytest.approx(35.0)
+    assert pkt.data["cell_setup_lo_cell_temp_c"] == pytest.approx(-20.0)
+    assert pkt.data["cell_setup_hi_cell_temp_c"] == pytest.approx(45.0)
+    assert pkt.data["cell_setup_nom_cells_in_series"] == 16
+
+
+# ---------------------------------------------------------------------------
+# Shunt Setup (0x4C58)
+# ---------------------------------------------------------------------------
+
+
+def test_shunt_setup_parses_nom_capacity():
+    header = make_header(MSG_SHUNT_SETUP)
+    payload = bytearray(38)
+    struct.pack_into("<f", payload, 16, 200.0)  # HwShuntNomCapacity = 200 Ah
+    payload[36] = 0  # HwShuntReverseFlow = False
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_SHUNT_SETUP
+    assert pkt.data["shunt_setup_nom_capacity_ah"] == pytest.approx(200.0)
+    assert pkt.data["shunt_setup_reverse_flow"] is False
+
+
+# ---------------------------------------------------------------------------
+# Expansion Setup (0x4D34)
+# ---------------------------------------------------------------------------
+
+
+def test_expansion_setup_parses_relay_modes():
+    header = make_header(MSG_EXPANSION_SETUP_V4)
+    payload = bytearray(24)
+    payload[1] = 3  # HwExpansionTemplate = 3
+    payload[3] = 5  # HwExpansionRelay1 = 5
+    payload[4] = 6  # HwExpansionRelay2 = 6
+    payload[5] = 7  # HwExpansionRelay3 = 7
+    payload[6] = 8  # HwExpansionRelay4 = 8
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_EXPANSION_SETUP_V4
+    assert pkt.data["expansion_setup_template"] == 3
+    assert pkt.data["expansion_setup_relay1"] == 5
+    assert pkt.data["expansion_setup_relay2"] == 6
+    assert pkt.data["expansion_setup_relay3"] == 7
+    assert pkt.data["expansion_setup_relay4"] == 8
+
+
+# ---------------------------------------------------------------------------
+# Control Remote Setup (0x4E58)
+# ---------------------------------------------------------------------------
+
+
+def test_remote_setup_parses_charge_discharge_targets():
+    header = make_header(MSG_REMOTE_SETUP)
+    payload = bytearray(37)
+    struct.pack_into("<h", payload, 0, 5600)   # ChargeTargetNormVolt
+    struct.pack_into("<h", payload, 2, 1000)   # ChargeTargetNormAmp
+    struct.pack_into("<h", payload, 6, 5400)   # ChargeTargetLimpVolt
+    struct.pack_into("<h", payload, 8, 200)    # ChargeTargetLimpAmp
+    struct.pack_into("<h", payload, 18, 4800)  # DischargeTargetNormVolt
+    struct.pack_into("<h", payload, 20, 800)   # DischargeTargetNormAmp
+    struct.pack_into("<h", payload, 24, 4600)  # DischargeTargetLimpVolt
+    struct.pack_into("<h", payload, 26, 100)   # DischargeTargetLimpAmp
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_REMOTE_SETUP
+    assert pkt.data["remote_charge_target_norm_volt"] == 5600
+    assert pkt.data["remote_charge_target_norm_amp"] == 1000
+    assert pkt.data["remote_charge_target_limp_volt"] == 5400
+    assert pkt.data["remote_dischg_target_norm_volt"] == 4800
+    assert pkt.data["remote_dischg_target_limp_amp"] == 100
+
+
+# ---------------------------------------------------------------------------
+# Control Critical Setup (0x4F33)
+# ---------------------------------------------------------------------------
+
+
+def test_critical_setup_parses_protection_thresholds():
+    header = make_header(MSG_CRITICAL_SETUP)
+    payload = bytearray(67)
+    struct.pack_into("<h", payload, 5, 2700)   # CellVoltLo = 2700 mV
+    struct.pack_into("<h", payload, 7, 4250)   # CellVoltHi = 4250 mV
+    payload[11] = 20   # CellTempLo = 20-40 = -20°C
+    payload[12] = 85   # CellTempHi = 85-40 = 45°C
+    struct.pack_into("<h", payload, 15, 4000)  # SupplyVoltLo = 4000 mV
+    struct.pack_into("<h", payload, 17, 5800)  # SupplyVoltHi = 5800 mV
+    struct.pack_into("<h", payload, 33, 5000)  # ShuntPeakCharge = 5000/100 = 50 A
+    struct.pack_into("<h", payload, 38, 4000)  # ShuntPeakDischg = 4000/100 = 40 A
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_CRITICAL_SETUP
+    assert pkt.data["critical_setup_cell_volt_lo_mv"] == 2700
+    assert pkt.data["critical_setup_cell_volt_hi_mv"] == 4250
+    assert pkt.data["critical_setup_cell_temp_lo_c"] == pytest.approx(-20.0)
+    assert pkt.data["critical_setup_cell_temp_hi_c"] == pytest.approx(45.0)
+    assert pkt.data["critical_setup_supply_volt_lo_mv"] == 4000
+    assert pkt.data["critical_setup_supply_volt_hi_mv"] == 5800
+    assert pkt.data["critical_setup_shunt_peak_charge_a"] == pytest.approx(50.0)
+    assert pkt.data["critical_setup_shunt_peak_dischg_a"] == pytest.approx(40.0)
+
+
+# ---------------------------------------------------------------------------
+# Control Charge Setup (0x5033)
+# ---------------------------------------------------------------------------
+
+
+def test_charge_setup_parses_limits():
+    header = make_header(MSG_CHARGE_SETUP)
+    payload = bytearray(52)
+    struct.pack_into("<h", payload, 22, 4200)   # CellVoltHi = 4200 mV
+    struct.pack_into("<h", payload, 24, 4150)   # CellVoltResume = 4150 mV
+    payload[36] = 210  # ShuntSocHi: _decode_soc(210) = 100%
+    payload[37] = 180  # ShuntSocResume: _decode_soc(180) = 85%
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_CHARGE_SETUP
+    assert pkt.data["charge_setup_cell_volt_hi_mv"] == 4200
+    assert pkt.data["charge_setup_cell_volt_resume_mv"] == 4150
+    assert pkt.data["charge_setup_shunt_soc_hi_pct"] == pytest.approx(100.0)
+    assert pkt.data["charge_setup_shunt_soc_resume_pct"] == pytest.approx(85.0)
+
+
+# ---------------------------------------------------------------------------
+# Control Discharge Setup (0x5158)
+# ---------------------------------------------------------------------------
+
+
+def test_discharge_setup_parses_limits():
+    header = make_header(MSG_DISCHARGE_SETUP)
+    payload = bytearray(41)
+    struct.pack_into("<h", payload, 16, 2800)  # CellVoltLo = 2800 mV
+    struct.pack_into("<h", payload, 18, 2900)  # CellVoltResume = 2900 mV
+    payload[30] = 20   # ShuntSocLo: _decode_soc(20) = 5%
+    payload[31] = 30   # ShuntSocResume: _decode_soc(30) = 10%
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_DISCHARGE_SETUP
+    assert pkt.data["discharge_setup_cell_volt_lo_mv"] == 2800
+    assert pkt.data["discharge_setup_cell_volt_resume_mv"] == 2900
+    assert pkt.data["discharge_setup_shunt_soc_lo_pct"] == pytest.approx(5.0)
+    assert pkt.data["discharge_setup_shunt_soc_resume_pct"] == pytest.approx(10.0)
+
+
+# ---------------------------------------------------------------------------
+# Control Thermal Setup (0x5258)
+# ---------------------------------------------------------------------------
+
+
+def test_thermal_setup_parses_heat_cool_thresholds():
+    header = make_header(MSG_THERMAL_SETUP)
+    payload = bytearray(28)
+    payload[0] = 1   # ControlHeatMode = 1
+    payload[1] = 1   # MonitorLoCellTemp = True
+    payload[2] = 0   # MonitorLoAmbient = False
+    payload[3] = 25  # HeatLoCellTemp = 25-40 = -15°C
+    payload[4] = 20  # HeatLoAmbient = 20-40 = -20°C
+    payload[13] = 0  # ControlCoolMode = 0
+    payload[14] = 1  # MonitorHiCellTemp = True
+    payload[15] = 1  # MonitorHiAmbient = True
+    payload[16] = 0  # MonitorInBypass = False
+    payload[17] = 85  # CoolHiCellTemp = 85-40 = 45°C
+    payload[18] = 80  # CoolHiAmbient = 80-40 = 40°C
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_THERMAL_SETUP
+    assert pkt.data["thermal_heat_mode"] == 1
+    assert pkt.data["thermal_heat_monitor_cell_temp"] is True
+    assert pkt.data["thermal_heat_monitor_ambient"] is False
+    assert pkt.data["thermal_heat_lo_cell_temp_c"] == pytest.approx(-15.0)
+    assert pkt.data["thermal_heat_lo_ambient_c"] == pytest.approx(-20.0)
+    assert pkt.data["thermal_cool_mode"] == 0
+    assert pkt.data["thermal_cool_monitor_cell_temp"] is True
+    assert pkt.data["thermal_cool_hi_cell_temp_c"] == pytest.approx(45.0)
+    assert pkt.data["thermal_cool_hi_ambient_c"] == pytest.approx(40.0)
+
+
+# ---------------------------------------------------------------------------
+# HW Integration Setup v4 (0x5334)
+# ---------------------------------------------------------------------------
+
+
+def test_integration_setup_v4_parses_bus_config():
+    header = make_header(MSG_INTEGRATION_SETUP_V4)
+    payload = bytearray(18)
+    payload[1] = 1  # USB broadcast enabled
+    payload[2] = 1  # WiFi broadcast enabled
+    payload[3] = 3  # WiFi broadcast mode
+    payload[4] = 1  # CANbus broadcast enabled
+    payload[5] = 5  # CANbus mode
+    struct.pack_into("<I", payload, 6, 0x18FF50E5)   # CANbus remote addr
+    struct.pack_into("<I", payload, 10, 0x300)        # CANbus base addr
+    struct.pack_into("<I", payload, 14, 0x400)        # CANbus group addr
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_INTEGRATION_SETUP_V4
+    assert pkt.data["integration_usb_broadcast_enabled"] is True
+    assert pkt.data["integration_wifi_broadcast_mode"] == 3
+    assert pkt.data["integration_canbus_mode"] == 5
+    assert pkt.data["integration_canbus_remote_addr"] == 0x18FF50E5
+    assert pkt.data["integration_canbus_base_addr"] == 0x300
+    assert pkt.data["integration_canbus_group_addr"] == 0x400
+    # No MQTT fields in 0x5334 (unlike 0x5335)
+    assert "integration_mqtt_broadcast_enabled" not in pkt.data
 
 
 # ---------------------------------------------------------------------------

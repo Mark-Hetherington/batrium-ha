@@ -31,17 +31,29 @@ MSG_REMOTE_SETUP_FULL = 0x4E33  # Freq D: 40 s, remote charge/discharge targets
 MSG_LOGIC_CONTROL = 0x4732  # Freq C: 1.55s
 MSG_STATUS_CONTROL_LOGIC = 0x4733  # Freq C: ~2s, compact logic status
 MSG_REMOTE_STATUS = 0x4932  # Freq C: 1.55s
+MSG_STATUS_SLOW_V2 = 0x4032  # Freq D: 30 s, slow status v2 (setup versions + duration)
+MSG_STATUS_SLOW_V3 = 0x4033  # Freq D: 30 s, slow status v3 (session records + shunt info)
 MSG_TELEMETRY_SLOW = 0x405A  # Freq D: 22s
 MSG_SYSTEM_SETUP = 0x4A33  # Freq D: 22s
-MSG_CELL_GROUP_SETUP = 0x4B33  # Freq D: 22s
+MSG_HW_SYSTEM_SETUP_V4 = 0x4A34  # Freq D, HW system setup v4
+MSG_HW_SYSTEM_SETUP_V5 = 0x4A35  # Freq D, HW system setup v5
+MSG_CELL_GROUP_SETUP = 0x4B33  # Freq D: 22s (no upstream payload, kept for reference)
+MSG_CELL_GROUP_SETUP_V4 = 0x4B34  # Freq D, cell group setup v4
+MSG_CELL_GROUP_SETUP_V5 = 0x4B35  # Freq D, cell group setup v5
+MSG_CELL_GROUP_SETUP_V6 = 0x4B36  # Freq D, cell group setup v6
+MSG_SHUNT_SETUP_V3 = 0x4C33  # Freq D, shunt setup v3
+MSG_SHUNT_SETUP_V4 = 0x4C34  # Freq D, shunt setup v4
 MSG_SHUNT_SETUP = 0x4C58  # Freq D: 22s
-MSG_EXPANSION_SETUP = 0x4D58  # Freq D: 22s
+MSG_EXPANSION_SETUP_V3 = 0x4D33  # Freq D, expansion setup v3
+MSG_EXPANSION_SETUP_V4 = 0x4D34  # Freq D, expansion setup v4
+MSG_EXPANSION_SETUP = 0x4D58  # Freq D: 22s (no upstream payload, kept for reference)
 MSG_REMOTE_SETUP = 0x4E58  # Freq D: 22s
-MSG_CRITICAL_SETUP = 0x4F58  # Freq D: 22s
+MSG_CRITICAL_SETUP = 0x4F33  # Freq D, critical protection setup
 MSG_CHARGE_SETUP = 0x5033  # Freq D: 22s
 MSG_DISCHARGE_SETUP = 0x5158  # Freq D: 22s
 MSG_THERMAL_SETUP = 0x5258  # Freq D: 22s
-MSG_INTEGRATION_SETUP = 0x5333  # Freq D: 22s
+MSG_INTEGRATION_SETUP = 0x5333  # Freq D: 22s (no upstream payload, kept for reference)
+MSG_INTEGRATION_SETUP_V4 = 0x5334  # Freq D, integration setup v4 (no MQTT)
 MSG_DAILY_SESSION = 0x5457  # Freq D: 22s
 MSG_THERMAL_SETUP_FULL = 0x5233  # Freq D: 22 s, thermal control configuration
 MSG_DAILY_SESSION_FULL = 0x5432  # Freq D: 20 s, daily session with kWh
@@ -222,6 +234,39 @@ SENSOR_QUICK_SESSION_NUM_RECORDS = "quick_session_num_records"
 SENSOR_QUICK_SESSION_MAX_RECORDS = "quick_session_max_records"
 SENSOR_DAILY_SESSION_NUM_RECORDS = "daily_session_num_records"
 SENSOR_DAILY_SESSION_MAX_RECORDS = "daily_session_max_records"
+
+# --- Cell Group Setup (0x4B34/35/36) ---
+SENSOR_CELL_SETUP_NOM_VOLT = "cell_setup_nom_cell_volt_mv"
+SENSOR_CELL_SETUP_LO_VOLT = "cell_setup_lo_cell_volt_mv"
+SENSOR_CELL_SETUP_HI_VOLT = "cell_setup_hi_cell_volt_mv"
+SENSOR_CELL_SETUP_BYPASS_VOLT = "cell_setup_bypass_volt_mv"
+SENSOR_CELL_SETUP_BYPASS_AMP = "cell_setup_bypass_amp_limit_ma"
+SENSOR_CELL_SETUP_NOM_CELLS = "cell_setup_nom_cells_in_series"
+
+# --- Shunt Setup (0x4C33/34/58) ---
+SENSOR_SHUNT_SETUP_NOM_CAP = "shunt_setup_nom_capacity_ah"
+
+# --- Critical Setup (0x4F33) ---
+SENSOR_CRITICAL_CELL_VOLT_LO = "critical_setup_cell_volt_lo_mv"
+SENSOR_CRITICAL_CELL_VOLT_HI = "critical_setup_cell_volt_hi_mv"
+SENSOR_CRITICAL_CELL_TEMP_LO = "critical_setup_cell_temp_lo_c"
+SENSOR_CRITICAL_CELL_TEMP_HI = "critical_setup_cell_temp_hi_c"
+SENSOR_CRITICAL_SUPPLY_VOLT_LO = "critical_setup_supply_volt_lo_mv"
+SENSOR_CRITICAL_SUPPLY_VOLT_HI = "critical_setup_supply_volt_hi_mv"
+SENSOR_CRITICAL_SHUNT_PEAK_CHG = "critical_setup_shunt_peak_charge_a"
+SENSOR_CRITICAL_SHUNT_PEAK_DCH = "critical_setup_shunt_peak_dischg_a"
+
+# --- Charge Setup (0x5033) ---
+SENSOR_CHARGE_CELL_VOLT_HI = "charge_setup_cell_volt_hi_mv"
+SENSOR_CHARGE_CELL_VOLT_RESUME = "charge_setup_cell_volt_resume_mv"
+SENSOR_CHARGE_SOC_HI = "charge_setup_shunt_soc_hi_pct"
+SENSOR_CHARGE_SOC_RESUME = "charge_setup_shunt_soc_resume_pct"
+
+# --- Discharge Setup (0x5158) ---
+SENSOR_DISCHG_CELL_VOLT_LO = "discharge_setup_cell_volt_lo_mv"
+SENSOR_DISCHG_CELL_VOLT_RESUME = "discharge_setup_cell_volt_resume_mv"
+SENSOR_DISCHG_SOC_LO = "discharge_setup_shunt_soc_lo_pct"
+SENSOR_DISCHG_SOC_RESUME = "discharge_setup_shunt_soc_resume_pct"
 
 # Config flow
 CONF_UDP_PORT = "udp_port"
