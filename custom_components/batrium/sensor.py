@@ -32,6 +32,7 @@ from .const import (
     DOMAIN,
     SENSOR_COMMS_CANBUS,
     SENSOR_COMMS_CMU,
+    SENSOR_COMMS_WIFI_RSSI,
     SENSOR_COMMS_WIFI_STATE,
     SENSOR_CTRL_CHARGE_POWER_RATE,
     SENSOR_CTRL_DISCHG_POWER_RATE,
@@ -403,6 +404,13 @@ SYSTEM_SENSORS: tuple[BatriumSensorEntityDescription, ...] = (
         name="CMU Op Status",
         icon="mdi:chip",
         state_class=SensorStateClass.MEASUREMENT,
+    ),
+    BatriumSensorEntityDescription(
+        key="comms_wifi_rssi",
+        state_key=SENSOR_COMMS_WIFI_RSSI,
+        name="WiFi RSSI",
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:wifi-strength-2",
     ),
 )
 

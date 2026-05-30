@@ -43,6 +43,7 @@ MSG_DAILY_SESSION_FULL = 0x5432  # Freq D: 20 s, daily session with kWh
 MSG_SHUNT_METRIC = 0x7857  # Freq D: 22s
 MSG_LIFE_METRIC = 0x5632  # Freq D: 22s
 MSG_COMMS_STATUS = 0x6131  # Freq C: 2 s, comms link health
+MSG_COMMS_STATUS_FULL = 0x6133  # Freq B: 300 ms, detailed comms + WiFi RSSI
 
 # Legacy message types (also handled)
 MSG_LEGACY_FAST = 0x3F5A
@@ -151,8 +152,9 @@ SENSOR_SHUNT_AVG_DISCHG_A = "shunt_accum_avg_dischg_a"
 SENSOR_DAILY_CHARGE_KWH = "daily_cumulative_charge_kwh"
 SENSOR_DAILY_DISCHG_KWH = "daily_cumulative_discharge_kwh"
 
-# --- Comms Status (0x6131) ---
+# --- Comms Status (0x6131 / 0x6133) ---
 SENSOR_COMMS_WIFI_STATE = "comms_wifi_state"
+SENSOR_COMMS_WIFI_RSSI = "comms_wifi_rssi"
 SENSOR_COMMS_CANBUS = "comms_canbus_op_status"
 SENSOR_COMMS_CMU = "comms_cmu_op_status"
 

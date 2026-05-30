@@ -7,6 +7,7 @@ import pytest
 from custom_components.batrium.const import (
     MSG_CELL_STATS,
     MSG_COMMS_STATUS,
+    MSG_COMMS_STATUS_FULL,
     MSG_DAILY_SESSION_FULL,
     MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
@@ -310,6 +311,35 @@ def test_comms_status_parses_diagnostics():
     assert pkt.data["comms_wifi_state"] == 3
     assert pkt.data["comms_canbus_op_status"] == 1
     assert pkt.data["comms_cmu_op_status"] == 2
+
+
+def test_comms_status_full_parses_rssi_and_cell_group():
+    header = make_header(MSG_COMMS_STATUS_FULL)
+    payload = bytearray(86)
+    payload[4] = 3  # SystemOpStatus = 3 (Discharging)
+    payload[9] = 3  # WifiState = 3 (Broadcast Running)
+    payload[14] = 72  # WifiRssi = 72
+    payload[15] = 1  # CanbusOpStatus = 1
+    payload[22] = 1  # ShuntStatus = 1 (Discharging)
+    payload[51] = 1  # CmuOpStatus = 1
+    struct.pack_into("<h", payload, 56, 3250)  # GroupMinCellVolt = 3250 mV
+    struct.pack_into("<h", payload, 58, 3580)  # GroupMaxCellVolt = 3580 mV
+    payload[60] = 65  # GroupMinCellTemp = 65-40 = 25°C
+    payload[61] = 70  # GroupMaxCellTemp = 70-40 = 30°C
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_COMMS_STATUS_FULL
+    assert pkt.data["system_op_status"] == 3
+    assert pkt.data["system_op_status_text"] == "Discharging"
+    assert pkt.data["comms_wifi_state"] == 3
+    assert pkt.data["comms_wifi_rssi"] == 72
+    assert pkt.data["comms_canbus_op_status"] == 1
+    assert pkt.data["comms_cmu_op_status"] == 1
+    assert pkt.data["min_cell_voltage_mv"] == 3250
+    assert pkt.data["max_cell_voltage_mv"] == 3580
+    assert pkt.data["min_cell_temp_c"] == pytest.approx(25.0)
+    assert pkt.data["max_cell_temp_c"] == pytest.approx(30.0)
 
 
 # ---------------------------------------------------------------------------

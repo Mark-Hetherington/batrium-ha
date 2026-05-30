@@ -18,6 +18,7 @@ from .const import (
     MSG_CELL_FULL_INFO,
     MSG_CELL_STATS,
     MSG_COMMS_STATUS,
+    MSG_COMMS_STATUS_FULL,
     MSG_DAILY_SESSION,
     MSG_DAILY_SESSION_FULL,
     MSG_LEGACY_CELL_FULL,
@@ -655,6 +656,39 @@ def _parse_comms_status(p: bytes) -> dict:
     }
 
 
+def _parse_comms_status_full(p: bytes) -> dict:
+    """0x6133 - Status Comms Full (94 bytes, 300 ms). Superset of 0x6131."""
+    o = OFFSET_PAYLOAD
+    op_status = p[o + 4]
+    wifi_state = p[o + 9]
+    wifi_rssi = p[o + 14]
+    canbus_status = p[o + 15]
+    shunt_status = p[o + 22]
+    cmu_status = p[o + 51]
+    group_min_cv = struct.unpack_from("<h", p, o + 56)[0]
+    group_max_cv = struct.unpack_from("<h", p, o + 58)[0]
+    group_min_ct = _decode_temp(p[o + 60])
+    group_max_ct = _decode_temp(p[o + 61])
+    return {
+        # Reuse existing state_keys
+        "system_op_status": op_status,
+        "system_op_status_text": SYSTEM_OP_STATUS.get(
+            op_status, f"Unknown({op_status})"
+        ),
+        "shunt_status": shunt_status,
+        "comms_wifi_state": wifi_state,
+        "comms_canbus_op_status": canbus_status,
+        "comms_cmu_op_status": cmu_status,
+        # Reuse cell min/max keys — group context cell stats
+        "min_cell_voltage_mv": group_min_cv,
+        "max_cell_voltage_mv": group_max_cv,
+        "min_cell_temp_c": group_min_ct,
+        "max_cell_temp_c": group_max_ct,
+        # New: WiFi signal strength
+        "comms_wifi_rssi": wifi_rssi,
+    }
+
+
 def _parse_status_control_logic(p: bytes) -> dict:
     """0x4733 - Status Control Logic (41 bytes, compact successor to 0x4732)."""
     o = OFFSET_PAYLOAD
@@ -722,6 +756,7 @@ _DISPATCH: dict[int, Any] = {
     MSG_DAILY_SESSION_FULL: _parse_daily_session_full,
     MSG_SHUNT_METRIC: _parse_shunt_metric,
     MSG_COMMS_STATUS: _parse_comms_status,
+    MSG_COMMS_STATUS_FULL: _parse_comms_status_full,
     MSG_LIFE_METRIC: _parse_life_metric,
     MSG_CELL_FULL_INFO: _parse_cell_full_info,
     MSG_LEGACY_CELL_FULL: _parse_cell_full_info,
