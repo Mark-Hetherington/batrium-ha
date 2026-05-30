@@ -19,6 +19,7 @@ OFFSET_PAYLOAD = 8  # Data begins at byte 8
 # Message type identifiers
 MSG_CELL_BASIC_STATUS = 0x415A  # Freq A: 147ms
 MSG_CELL_FULL_INFO = 0x4232  # Freq A: 147ms
+MSG_LIVE_DISPLAY = 0x3233  # Freq C: 2 s, compact live overview
 MSG_CELL_STATS = 0x3E33  # Freq B: 300 ms, cell aggregate stats + node IDs
 MSG_TELEMETRY_RAPID = 0x3E5A  # Freq B: 294ms
 MSG_SHUNT_STATUS = 0x3F34  # Freq B: 300 ms, shunt power + precision SoC
@@ -136,6 +137,10 @@ SENSOR_DURATION_TO_EMPTY = "estimated_duration_to_empty_min"
 SENSOR_RECENT_CHARGE_MAH = "recent_charge_mah"
 SENSOR_RECENT_DISCHARGE_MAH = "recent_discharge_mah"
 SENSOR_RECENT_NETT_MAH = "recent_nett_mah"
+
+# --- Live Display (0x3233) ---
+SENSOR_SHUNT_CUMUL_CHARGE_KWH = "shunt_cumul_charge_kwh"
+SENSOR_SHUNT_CUMUL_DISCHG_KWH = "shunt_cumul_dischg_kwh"
 
 # --- Cell Stats (0x3E33) ---
 SENSOR_MIN_CELL_VOLT_NODE = "min_cell_voltage_node_id"

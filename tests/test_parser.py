@@ -9,6 +9,7 @@ from custom_components.batrium.const import (
     MSG_COMMS_STATUS,
     MSG_COMMS_STATUS_FULL,
     MSG_DAILY_SESSION_FULL,
+    MSG_LIVE_DISPLAY,
     MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
     MSG_SYSTEM_DISCO,
@@ -175,6 +176,55 @@ def test_disco_parses_battery_ok():
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
     assert pkt.data["battery_ok_state"] is True
+
+
+# ---------------------------------------------------------------------------
+# Live Display (0x3233)
+# ---------------------------------------------------------------------------
+
+
+def test_live_display_parses_overview():
+    header = make_header(MSG_LIVE_DISPLAY)
+    payload = bytearray(49)
+    payload[0] = 2  # SystemOpStatus = 2 (Charging)
+    payload[2] = 0b00001001  # flags1: CritBatOk + HeatOn
+    payload[3] = 0b00000101  # flags2: ChargeOnState + DischgOnState
+    struct.pack_into("<h", payload, 4, 3100)  # MinCellVolt = 3100 mV
+    struct.pack_into("<h", payload, 6, 3650)  # MaxCellVolt = 3650 mV
+    struct.pack_into("<h", payload, 8, 3375)  # AvgCellVolt = 3375 mV
+    payload[10] = 55  # MinCellTemp = 55-40 = 15°C
+    payload[11] = 70  # MaxCellTemp = 70-40 = 30°C
+    payload[13] = 3  # NumOfCellsInBypass = 3
+    struct.pack_into("<h", payload, 14, 5200)  # ShuntVoltage raw=5200 → 52000 mV
+    struct.pack_into("<f", payload, 16, 20000.0)  # ShuntCurrent = 20000 mA
+    struct.pack_into("<f", payload, 20, 3000.0)  # ShuntPowerVA = 3000 W
+    struct.pack_into("<h", payload, 24, 7500)  # ShuntSOC = 7500/100 = 75.00%
+    struct.pack_into("<f", payload, 26, 80000.0)  # NomCapacityToEmpty = 80000 mAh
+    struct.pack_into("<f", payload, 30, 1500000.0)  # CumulkWhCharge = 1500 kWh
+    struct.pack_into("<f", payload, 34, 1450000.0)  # CumulkWhDischg = 1450 kWh
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_LIVE_DISPLAY
+    assert pkt.data["system_op_status"] == 2
+    assert pkt.data["system_op_status_text"] == "Charging"
+    assert pkt.data["critical_battery_ok"] is True
+    assert pkt.data["thermal_heat_on"] is True
+    assert pkt.data["thermal_cool_on"] is False
+    assert pkt.data["charging_is_on"] is True
+    assert pkt.data["discharging_is_on"] is True
+    assert pkt.data["min_cell_voltage_mv"] == 3100
+    assert pkt.data["max_cell_voltage_mv"] == 3650
+    assert pkt.data["avg_cell_voltage_mv"] == 3375
+    assert pkt.data["min_cell_temp_c"] == pytest.approx(15.0)
+    assert pkt.data["cells_in_bypass"] == 3
+    assert pkt.data["shunt_voltage"] == 52000
+    assert pkt.data["shunt_current_ma"] == pytest.approx(20000.0)
+    assert pkt.data["shunt_power_w"] == pytest.approx(3000.0)
+    assert pkt.data["shunt_state_of_charge_pct"] == pytest.approx(75.0)
+    assert pkt.data["shunt_capacity_to_empty_mah"] == pytest.approx(80000.0)
+    assert pkt.data["shunt_cumul_charge_kwh"] == pytest.approx(1500.0)
+    assert pkt.data["shunt_cumul_dischg_kwh"] == pytest.approx(1450.0)
 
 
 # ---------------------------------------------------------------------------

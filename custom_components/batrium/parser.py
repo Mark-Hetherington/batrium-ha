@@ -27,6 +27,7 @@ from .const import (
     MSG_LEGACY_LOGIC,
     MSG_LEGACY_REMOTE,
     MSG_LIFE_METRIC,
+    MSG_LIVE_DISPLAY,
     MSG_LOGIC_CONTROL,
     MSG_REMOTE_STATUS,
     MSG_SHUNT_METRIC,
@@ -519,6 +520,58 @@ def _parse_cell_full_info(p: bytes) -> dict:
     }
 
 
+def _parse_live_display(p: bytes) -> dict:
+    """0x3233 - Live Display (57 bytes, 2 s). Compact system overview."""
+    o = OFFSET_PAYLOAD
+    op_status = p[o + 0]
+    flags1 = p[o + 2]
+    flags2 = p[o + 3]
+    min_cv = struct.unpack_from("<h", p, o + 4)[0]
+    max_cv = struct.unpack_from("<h", p, o + 6)[0]
+    avg_cv = struct.unpack_from("<h", p, o + 8)[0]
+    min_ct = _decode_temp(p[o + 10])
+    max_ct = _decode_temp(p[o + 11])
+    avg_ct = _decode_temp(p[o + 12])
+    cells_in_bypass = p[o + 13]
+    shunt_v_raw = struct.unpack_from("<h", p, o + 14)[0]
+    shunt_i = struct.unpack_from("<f", p, o + 16)[0]
+    shunt_pwr = struct.unpack_from("<f", p, o + 20)[0]
+    shunt_soc_raw = struct.unpack_from("<h", p, o + 24)[0]
+    cap_empty = struct.unpack_from("<f", p, o + 26)[0]
+    cumul_kwh_chg = struct.unpack_from("<f", p, o + 30)[0]
+    cumul_kwh_dischg = struct.unpack_from("<f", p, o + 34)[0]
+    return {
+        # System status
+        "system_op_status": op_status,
+        "system_op_status_text": SYSTEM_OP_STATUS.get(
+            op_status, f"Unknown({op_status})"
+        ),
+        # Critical / thermal / charge / discharge flags — reuse binary sensor keys
+        "critical_battery_ok": bool(flags1 & 0x01),
+        "thermal_heat_on": bool(flags1 & 0x08),
+        "thermal_cool_on": bool(flags1 & 0x10),
+        "charging_is_on": bool(flags2 & 0x01),
+        "discharging_is_on": bool(flags2 & 0x04),
+        # Cell stats — reuse existing rapid/cell-stats keys
+        "min_cell_voltage_mv": min_cv,
+        "max_cell_voltage_mv": max_cv,
+        "avg_cell_voltage_mv": avg_cv,
+        "min_cell_temp_c": min_ct,
+        "max_cell_temp_c": max_ct,
+        "avg_cell_temp_c": avg_ct,
+        "cells_in_bypass": cells_in_bypass,
+        # Shunt — reuse existing shunt keys
+        "shunt_voltage": shunt_v_raw * 10,
+        "shunt_current_ma": shunt_i,
+        "shunt_power_w": shunt_pwr,
+        "shunt_state_of_charge_pct": shunt_soc_raw / 100.0,
+        "shunt_capacity_to_empty_mah": cap_empty,
+        # New: lifetime cumulative kWh (raw float / 1000)
+        "shunt_cumul_charge_kwh": cumul_kwh_chg / 1000.0,
+        "shunt_cumul_dischg_kwh": cumul_kwh_dischg / 1000.0,
+    }
+
+
 def _parse_cell_stats(p: bytes) -> dict:
     """0x3E33 - Status Cell Stats (48 bytes, 300 ms)."""
     o = OFFSET_PAYLOAD
@@ -738,6 +791,7 @@ def _parse_status_control_logic(p: bytes) -> dict:
 # ---------------------------------------------------------------------------
 
 _DISPATCH: dict[int, Any] = {
+    MSG_LIVE_DISPLAY: _parse_live_display,
     MSG_CELL_STATS: _parse_cell_stats,
     MSG_TELEMETRY_RAPID: _parse_rapid,
     MSG_SHUNT_STATUS: _parse_shunt_status,

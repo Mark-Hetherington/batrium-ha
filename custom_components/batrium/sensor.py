@@ -44,6 +44,8 @@ from .const import (
     SENSOR_MIN_CELL_VOLT_NODE,
     SENSOR_SHUNT_AVG_CHARGE_A,
     SENSOR_SHUNT_AVG_DISCHG_A,
+    SENSOR_SHUNT_CUMUL_CHARGE_KWH,
+    SENSOR_SHUNT_CUMUL_DISCHG_KWH,
     SENSOR_SHUNT_POWER_W,
 )
 from .coordinator import (
@@ -309,6 +311,23 @@ SYSTEM_SENSORS: tuple[BatriumSensorEntityDescription, ...] = (
         name="Discharge Power Rate",
         icon="mdi:battery-minus-outline",
         state_class=SensorStateClass.MEASUREMENT,
+    ),
+    # ── Live Display (0x3233) ─────────────────────────────────────────
+    BatriumSensorEntityDescription(
+        key="shunt_cumul_charge_kwh",
+        state_key=SENSOR_SHUNT_CUMUL_CHARGE_KWH,
+        name="Cumulative Charge Energy",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    BatriumSensorEntityDescription(
+        key="shunt_cumul_dischg_kwh",
+        state_key=SENSOR_SHUNT_CUMUL_DISCHG_KWH,
+        name="Cumulative Discharge Energy",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     # ── Cell Stats (0x3E33) ────────────────────────────────────────────
     BatriumSensorEntityDescription(
