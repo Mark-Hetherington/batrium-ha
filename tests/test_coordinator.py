@@ -27,8 +27,11 @@ def make_rapid_packet(min_v=3200, max_v=3450, cells_active=16) -> bytes:
 @pytest.fixture
 def mock_hass():
     hass = MagicMock()
-    hass.loop = asyncio.get_event_loop()
-    return hass
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    hass.loop = loop
+    yield hass
+    loop.close()
 
 
 @pytest.fixture
