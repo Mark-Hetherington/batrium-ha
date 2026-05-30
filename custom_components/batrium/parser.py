@@ -27,6 +27,7 @@ from .const import (
     MSG_CRITICAL_SETUP,
     MSG_DAILY_SESSION,
     MSG_DAILY_SESSION_FULL,
+    MSG_DAILY_SESSION_HIST,
     MSG_DISCHARGE_SETUP,
     MSG_EXPANSION_SETUP_V3,
     MSG_EXPANSION_SETUP_V4,
@@ -51,6 +52,7 @@ from .const import (
     MSG_REMOTE_SETUP,
     MSG_REMOTE_SETUP_FULL,
     MSG_REMOTE_STATUS,
+    MSG_QUICK_SESSION_HIST,
     MSG_SESSION_METRICS,
     MSG_SHUNT_METRIC,
     MSG_SHUNT_SETUP,
@@ -1329,6 +1331,100 @@ def _parse_thermal_setup(p: bytes) -> dict:
     }
 
 
+def _parse_daily_session_hist(p: bytes) -> dict:
+    """0x5831 - Daily Session History record (60 bytes). One compressed daily record per packet.
+
+    Each packet carries a single historical entry identified by hist_session_id and
+    hist_session_time.  Consecutive IDs are broadcast in sequence so the receiver
+    can build a log.  Cell/supply voltages are in mV; SoC values are decoded with
+    _decode_soc(); temperatures with _decode_temp().
+    """
+    o = OFFSET_PAYLOAD
+    session_id = struct.unpack_from("<h", p, o + 0)[0]           # offset 8
+    session_time = struct.unpack_from("<I", p, o + 2)[0]         # offset 10  (epoch)
+    critical_events = p[o + 6]                                    # offset 14
+    min_temp = _decode_temp(p[o + 8])                             # offset 16
+    max_temp = _decode_temp(p[o + 9])                             # offset 17
+    min_soc = _decode_soc(p[o + 10])                              # offset 18
+    max_soc = _decode_soc(p[o + 11])                              # offset 19
+    min_cell_v = struct.unpack_from("<h", p, o + 12)[0]           # offset 20  (mV)
+    max_cell_v = struct.unpack_from("<h", p, o + 14)[0]           # offset 22  (mV)
+    min_supply_v = struct.unpack_from("<h", p, o + 16)[0] * 10    # offset 24  (×10 → mV)
+    max_supply_v = struct.unpack_from("<h", p, o + 18)[0] * 10    # offset 26  (×10 → mV)
+    min_shunt_v = struct.unpack_from("<h", p, o + 20)[0] * 10     # offset 28  (×10 → mV)
+    max_shunt_v = struct.unpack_from("<h", p, o + 22)[0] * 10     # offset 30  (×10 → mV)
+    # 8 thermal-band hours (each raw÷10 = hours)
+    thermal_bands = [p[o + 24 + i] / 10.0 for i in range(8)]     # offsets 32-39
+    # 8 SoC-band hours (each raw÷10 = hours)
+    soc_bands = [p[o + 32 + i] / 10.0 for i in range(8)]         # offsets 40-47
+    peak_charge_a = struct.unpack_from("<h", p, o + 40)[0] / 100.0   # offset 48 (÷100 → A)
+    peak_dischg_a = struct.unpack_from("<h", p, o + 42)[0] / 100.0   # offset 50 (÷100 → A)
+    cumul_charge_ah = struct.unpack_from("<h", p, o + 44)[0] / 10.0  # offset 52 (÷10 → Ah)
+    cumul_dischg_ah = struct.unpack_from("<h", p, o + 46)[0] / 10.0  # offset 54 (÷10 → Ah)
+
+    return {
+        "hist_session_id": session_id,
+        "hist_session_time": session_time,
+        "hist_critical_events": critical_events,
+        "hist_min_temp_c": min_temp,
+        "hist_max_temp_c": max_temp,
+        "hist_min_soc_pct": min_soc,
+        "hist_max_soc_pct": max_soc,
+        "hist_min_cell_volt_mv": min_cell_v,
+        "hist_max_cell_volt_mv": max_cell_v,
+        "hist_min_supply_volt_mv": min_supply_v,
+        "hist_max_supply_volt_mv": max_supply_v,
+        "hist_min_shunt_volt_mv": min_shunt_v,
+        "hist_max_shunt_volt_mv": max_shunt_v,
+        "hist_thermal_bands_h": thermal_bands,
+        "hist_soc_bands_h": soc_bands,
+        "hist_peak_charge_a": peak_charge_a,
+        "hist_peak_dischg_a": peak_dischg_a,
+        "hist_cumul_charge_ah": cumul_charge_ah,
+        "hist_cumul_dischg_ah": cumul_dischg_ah,
+    }
+
+
+def _parse_quick_session_hist(p: bytes) -> dict:
+    """0x6831 - Quick Session History record (32 bytes). One snapshot per packet.
+
+    Each packet carries a single historical entry identified by hist_session_id and
+    hist_session_time.  Cell voltages in mV (raw as-is); SoC in % (raw÷100);
+    shunt voltage raw÷100 → V (×10 for mV); shunt current raw÷1000 → A.
+    """
+    o = OFFSET_PAYLOAD
+    session_id = struct.unpack_from("<h", p, o + 0)[0]          # offset 8
+    session_time = struct.unpack_from("<I", p, o + 2)[0]        # offset 10  (epoch)
+    system_op_state = p[o + 6]                                   # offset 14
+    control_logic = p[o + 7]                                     # offset 15
+    min_cell_v = struct.unpack_from("<h", p, o + 8)[0]           # offset 16  (mV)
+    max_cell_v = struct.unpack_from("<h", p, o + 10)[0]          # offset 18  (mV)
+    avg_cell_v = struct.unpack_from("<h", p, o + 12)[0]          # offset 20  (mV)
+    avg_cell_temp = _decode_temp(p[o + 14])                      # offset 22
+    soc_pct = struct.unpack_from("<h", p, o + 15)[0] / 100.0    # offset 23  (÷100 → %)
+    shunt_v = struct.unpack_from("<h", p, o + 17)[0] * 10        # offset 25  (×10 → mV)
+    shunt_a = struct.unpack_from("<f", p, o + 19)[0] / 1000.0   # offset 27  (÷1000 → A)
+    cells_in_bypass = p[o + 23]                                  # offset 31
+
+    return {
+        "hist_session_id": session_id,
+        "hist_session_time": session_time,
+        "hist_system_op_state": system_op_state,
+        "hist_system_op_state_text": SYSTEM_OP_STATUS.get(
+            system_op_state, f"Unknown({system_op_state})"
+        ),
+        "hist_control_logic": control_logic,
+        "hist_min_cell_volt_mv": min_cell_v,
+        "hist_max_cell_volt_mv": max_cell_v,
+        "hist_avg_cell_volt_mv": avg_cell_v,
+        "hist_avg_cell_temp_c": avg_cell_temp,
+        "hist_soc_pct": soc_pct,
+        "hist_shunt_volt_mv": shunt_v,
+        "hist_shunt_amp_a": shunt_a,
+        "hist_cells_in_bypass": cells_in_bypass,
+    }
+
+
 def _parse_integration_setup(p: bytes) -> dict:
     """0x5334 - HW Integration Setup v4 (26 bytes, 30 s). Bus config without MQTT."""
     o = OFFSET_PAYLOAD
@@ -1386,6 +1482,8 @@ _DISPATCH: dict[int, Any] = {
     MSG_INTEGRATION_SETUP_V4: _parse_integration_setup,
     MSG_DAILY_SESSION: _parse_daily_session,
     MSG_DAILY_SESSION_FULL: _parse_daily_session_full,
+    MSG_DAILY_SESSION_HIST: _parse_daily_session_hist,
+    MSG_QUICK_SESSION_HIST: _parse_quick_session_hist,
     MSG_NETWORK_SETUP: _parse_network_setup,
     MSG_INTEGRATION_SETUP_FULL: _parse_integration_setup_full,
     MSG_REMOTE_SETUP_FULL: _parse_remote_setup_full,

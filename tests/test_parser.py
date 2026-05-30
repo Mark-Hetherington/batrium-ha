@@ -12,6 +12,7 @@ from custom_components.batrium.const import (
     MSG_COMMS_STATUS_FULL,
     MSG_CRITICAL_SETUP,
     MSG_DAILY_SESSION_FULL,
+    MSG_DAILY_SESSION_HIST,
     MSG_DISCHARGE_SETUP,
     MSG_EXPANSION_SETUP_V4,
     MSG_HW_SHUNT_METRIC,
@@ -25,6 +26,7 @@ from custom_components.batrium.const import (
     MSG_LIFE_METRIC_V3,
     MSG_LIVE_DISPLAY,
     MSG_NETWORK_SETUP,
+    MSG_QUICK_SESSION_HIST,
     MSG_REMOTE_SETUP,
     MSG_REMOTE_SETUP_FULL,
     MSG_SESSION_METRICS,
@@ -1201,6 +1203,108 @@ def test_integration_setup_v4_parses_bus_config():
     assert pkt.data["integration_canbus_group_addr"] == 0x400
     # No MQTT fields in 0x5334 (unlike 0x5335)
     assert "integration_mqtt_broadcast_enabled" not in pkt.data
+
+
+# ---------------------------------------------------------------------------
+# Daily Session History (0x5831)
+# ---------------------------------------------------------------------------
+
+
+def test_daily_session_hist_parses_identity_and_cell_stats():
+    header = make_header(MSG_DAILY_SESSION_HIST)
+    payload = bytearray(52)
+    struct.pack_into("<h", payload, 0, 42)           # SessionId = 42
+    struct.pack_into("<I", payload, 2, 1_750_000_000)  # SessionTime (epoch)
+    payload[6] = 3                                   # CriticalEvents = 3
+    payload[8] = 55   # MinReportTemp = 55-40 = 15°C
+    payload[9] = 75   # MaxReportTemp = 75-40 = 35°C
+    payload[10] = 130  # MinShuntSoc = 130*0.5-5 = 60%
+    payload[11] = 180  # MaxShuntSoc = 180*0.5-5 = 85%
+    struct.pack_into("<h", payload, 12, 3100)  # MinCellVolt = 3100 mV
+    struct.pack_into("<h", payload, 14, 3700)  # MaxCellVolt = 3700 mV
+    struct.pack_into("<h", payload, 16, 480)   # MinSupplyVolt raw=480 → 4800 mV
+    struct.pack_into("<h", payload, 18, 530)   # MaxSupplyVolt raw=530 → 5300 mV
+    struct.pack_into("<h", payload, 40, 4500)  # ShuntPeakCharge = 4500/100 = 45 A
+    struct.pack_into("<h", payload, 42, 3000)  # ShuntPeakDischg = 3000/100 = 30 A
+    struct.pack_into("<h", payload, 44, 500)   # CumulCharge = 500/10 = 50 Ah
+    struct.pack_into("<h", payload, 46, 480)   # CumulDischg = 480/10 = 48 Ah
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_DAILY_SESSION_HIST
+    assert pkt.data["hist_session_id"] == 42
+    assert pkt.data["hist_session_time"] == 1_750_000_000
+    assert pkt.data["hist_critical_events"] == 3
+    assert pkt.data["hist_min_temp_c"] == pytest.approx(15.0)
+    assert pkt.data["hist_max_temp_c"] == pytest.approx(35.0)
+    assert pkt.data["hist_min_soc_pct"] == pytest.approx(60.0)
+    assert pkt.data["hist_max_soc_pct"] == pytest.approx(85.0)
+    assert pkt.data["hist_min_cell_volt_mv"] == 3100
+    assert pkt.data["hist_max_cell_volt_mv"] == 3700
+    assert pkt.data["hist_min_supply_volt_mv"] == 4800
+    assert pkt.data["hist_max_supply_volt_mv"] == 5300
+    assert pkt.data["hist_peak_charge_a"] == pytest.approx(45.0)
+    assert pkt.data["hist_peak_dischg_a"] == pytest.approx(30.0)
+    assert pkt.data["hist_cumul_charge_ah"] == pytest.approx(50.0)
+    assert pkt.data["hist_cumul_dischg_ah"] == pytest.approx(48.0)
+
+
+def test_daily_session_hist_parses_band_hours():
+    header = make_header(MSG_DAILY_SESSION_HIST)
+    payload = bytearray(52)
+    # Thermal bands at payload offsets 24-31 (packet offsets 32-39), raw÷10 = hours
+    payload[24] = 20   # band A = 2.0 h
+    payload[25] = 35   # band B = 3.5 h
+    payload[26] = 0    # band C = 0.0 h
+    # SoC bands at payload offsets 32-39
+    payload[32] = 10   # SoC band A = 1.0 h
+    payload[39] = 240  # SoC band H = 24.0 h
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.data["hist_thermal_bands_h"][0] == pytest.approx(2.0)
+    assert pkt.data["hist_thermal_bands_h"][1] == pytest.approx(3.5)
+    assert pkt.data["hist_thermal_bands_h"][2] == pytest.approx(0.0)
+    assert pkt.data["hist_soc_bands_h"][0] == pytest.approx(1.0)
+    assert pkt.data["hist_soc_bands_h"][7] == pytest.approx(24.0)
+
+
+# ---------------------------------------------------------------------------
+# Quick Session History (0x6831)
+# ---------------------------------------------------------------------------
+
+
+def test_quick_session_hist_parses_snapshot():
+    header = make_header(MSG_QUICK_SESSION_HIST)
+    payload = bytearray(24)
+    struct.pack_into("<h", payload, 0, 100)          # SessionId = 100
+    struct.pack_into("<I", payload, 2, 1_760_000_000)  # SessionTime (epoch)
+    payload[6] = 2   # SystemOpState = 2 (Charging)
+    payload[7] = 1   # ControlLogic = 1
+    struct.pack_into("<h", payload, 8, 3350)          # MinCellVolt = 3350 mV
+    struct.pack_into("<h", payload, 10, 3420)         # MaxCellVolt = 3420 mV
+    struct.pack_into("<h", payload, 12, 3385)         # AvgCellVolt = 3385 mV
+    payload[14] = 65  # AvgCellTemp = 65-40 = 25°C
+    struct.pack_into("<h", payload, 15, 7500)         # SocHiRes = 7500/100 = 75.0%
+    struct.pack_into("<h", payload, 17, 500)          # ShuntVolt raw=500 → 5000 mV
+    struct.pack_into("<f", payload, 19, 10_000.0)     # ShuntAmp raw=10000 → 10 A
+    payload[23] = 2                                   # CellsInBypass = 2
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_QUICK_SESSION_HIST
+    assert pkt.data["hist_session_id"] == 100
+    assert pkt.data["hist_session_time"] == 1_760_000_000
+    assert pkt.data["hist_system_op_state"] == 2
+    assert pkt.data["hist_system_op_state_text"] == "Charging"
+    assert pkt.data["hist_min_cell_volt_mv"] == 3350
+    assert pkt.data["hist_max_cell_volt_mv"] == 3420
+    assert pkt.data["hist_avg_cell_volt_mv"] == 3385
+    assert pkt.data["hist_avg_cell_temp_c"] == pytest.approx(25.0)
+    assert pkt.data["hist_soc_pct"] == pytest.approx(75.0)
+    assert pkt.data["hist_shunt_volt_mv"] == 5000
+    assert pkt.data["hist_shunt_amp_a"] == pytest.approx(10.0)
+    assert pkt.data["hist_cells_in_bypass"] == 2
 
 
 # ---------------------------------------------------------------------------
