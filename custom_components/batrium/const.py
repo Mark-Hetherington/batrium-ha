@@ -21,6 +21,7 @@ MSG_CELL_BASIC_STATUS = 0x415A  # Freq A: 147ms
 MSG_CELL_FULL_INFO = 0x4232  # Freq A: 147ms
 MSG_LIVE_DISPLAY = 0x3233  # Freq C: 2 s, compact live overview
 MSG_CELL_STATS = 0x3E33  # Freq B: 300 ms, cell aggregate stats + node IDs
+MSG_STATUS_RAPID = 0x3E32  # Freq B: 300 ms, rapid status v2 (adds shunt power)
 MSG_TELEMETRY_RAPID = 0x3E5A  # Freq B: 294ms
 MSG_SHUNT_STATUS = 0x3F34  # Freq B: 300 ms, shunt power + precision SoC
 MSG_TELEMETRY_FAST = 0x3F33  # Freq C: 1.55s
@@ -44,10 +45,17 @@ MSG_INTEGRATION_SETUP = 0x5333  # Freq D: 22s
 MSG_DAILY_SESSION = 0x5457  # Freq D: 22s
 MSG_THERMAL_SETUP_FULL = 0x5233  # Freq D: 22 s, thermal control configuration
 MSG_DAILY_SESSION_FULL = 0x5432  # Freq D: 20 s, daily session with kWh
+MSG_SESSION_METRICS = 0x5431  # Freq D: 30 s, quick/daily session record metadata
+MSG_HW_SHUNT_METRIC = 0x7832  # Freq D: 30 s, shunt metrics v2 with SoC recal timestamps
 MSG_SHUNT_METRIC = 0x7857  # Freq D: 22s
 MSG_INTEGRATION_SETUP_FULL = 0x5335  # Freq D: 30 s, integration bus config
 MSG_NETWORK_SETUP = 0x5A32  # Freq D: ~30 s, NTP + timezone config (undocumented)
 MSG_LIFE_METRIC = 0x5632  # Freq D: 22s
+MSG_LIFE_METRIC_V3 = 0x5633  # Freq D: 30 s, lifetime event counts v3
+MSG_LIFE_METRIC_B = 0x5634  # Freq D: 30 s, lifetime bypass/SoC limit metrics
+MSG_LIFE_METRIC_A = (
+    0x5635  # Freq D: 30 s, lifetime event counts v5 (superset of 0x5633)
+)
 MSG_COMMS_STATUS = 0x6131  # Freq C: 2 s, comms link health
 MSG_COMMS_STATUS_V1 = 0x6132  # Freq C: 2 s, comms link health (legacy v1)
 MSG_COMMS_STATUS_FULL = 0x6133  # Freq B: 300 ms, detailed comms + WiFi RSSI
@@ -187,6 +195,33 @@ SENSOR_COMMS_CMU = "comms_cmu_op_status"
 # --- Status Control Logic (0x4733) ---
 SENSOR_CTRL_CHARGE_POWER_RATE = "ctrl_charge_power_rate_state"
 SENSOR_CTRL_DISCHG_POWER_RATE = "ctrl_dischg_power_rate_state"
+
+# --- Life Metric (0x5632 base) ---
+SENSOR_LIFE_COUNT_STARTUP = "lifetime_count_startup"
+SENSOR_LIFE_COUNT_CRIT_OK = "lifetime_count_critical_ok"
+SENSOR_LIFE_COUNT_CHARGE_ON = "lifetime_count_charge_on"
+SENSOR_LIFE_COUNT_DISCHG_ON = "lifetime_count_discharge_on"
+SENSOR_LIFE_COUNT_DAILY = "lifetime_count_daily_sessions"
+
+# --- Life Metric v3/A (0x5633/0x5635) ---
+SENSOR_LIFE_COUNT_CHARGE_LIMP = "lifetime_count_charge_limp"
+SENSOR_LIFE_COUNT_DISCHG_LIMP = "lifetime_count_discharge_limp"
+SENSOR_LIFE_COUNT_HEAT_ON = "lifetime_count_heat_on"
+SENSOR_LIFE_COUNT_COOL_ON = "lifetime_count_cool_on"
+
+# --- Life Metric B (0x5634) ---
+SENSOR_LIFE_COUNT_SOC_LIMIT1 = "lifetime_count_soc_limit1"
+SENSOR_LIFE_COUNT_SOC_LIMIT2 = "lifetime_count_soc_limit2"
+SENSOR_LIFE_COUNT_SOC_LIMIT3 = "lifetime_count_soc_limit3"
+SENSOR_LIFE_COUNT_SOC_LIMIT4 = "lifetime_count_soc_limit4"
+SENSOR_LIFE_COUNT_ALT_CHARGE = "lifetime_count_alt_charge_on"
+SENSOR_LIFE_COUNT_ALT_DISCHG = "lifetime_count_alt_dischg_on"
+
+# --- Session Metrics (0x5431) ---
+SENSOR_QUICK_SESSION_NUM_RECORDS = "quick_session_num_records"
+SENSOR_QUICK_SESSION_MAX_RECORDS = "quick_session_max_records"
+SENSOR_DAILY_SESSION_NUM_RECORDS = "daily_session_num_records"
+SENSOR_DAILY_SESSION_MAX_RECORDS = "daily_session_max_records"
 
 # Config flow
 CONF_UDP_PORT = "udp_port"

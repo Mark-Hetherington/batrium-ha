@@ -9,13 +9,19 @@ from custom_components.batrium.const import (
     MSG_COMMS_STATUS,
     MSG_COMMS_STATUS_FULL,
     MSG_DAILY_SESSION_FULL,
+    MSG_HW_SHUNT_METRIC,
     MSG_HW_SYSTEM_SETUP_FULL,
     MSG_INTEGRATION_SETUP_FULL,
+    MSG_LIFE_METRIC_A,
+    MSG_LIFE_METRIC_B,
+    MSG_LIFE_METRIC_V3,
     MSG_LIVE_DISPLAY,
     MSG_NETWORK_SETUP,
     MSG_REMOTE_SETUP_FULL,
+    MSG_SESSION_METRICS,
     MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
+    MSG_STATUS_RAPID,
     MSG_SYSTEM_DISCO,
     MSG_TELEMETRY_FAST,
     MSG_TELEMETRY_RAPID,
@@ -589,7 +595,7 @@ def test_network_setup_parses_real_packet():
 def test_network_setup_disabled_ntp():
     header = make_header(MSG_NETWORK_SETUP)
     payload = bytearray(88)
-    payload[4] = 0   # ntp_enabled = False
+    payload[4] = 0  # ntp_enabled = False
     payload[6] = 60  # ntp_update_interval = 60
     payload[8:16] = b"UTC+0\x00\x00\x00"
     payload[60:73] = b"time.google.com"
@@ -638,6 +644,215 @@ def test_status_control_logic_critical_flags():
     assert pkt.data["critical_has_cells_low_voltage"] is True
     assert pkt.data["critical_has_cells_high_voltage"] is True
     assert pkt.data["critical_battery_ok"] is False
+
+
+# ---------------------------------------------------------------------------
+# Status Rapid v2 (0x3E32)
+# ---------------------------------------------------------------------------
+
+
+def test_status_rapid_v2_parses_cell_voltages():
+    header = make_header(MSG_STATUS_RAPID)
+    payload = bytearray(42)
+    struct.pack_into("<h", payload, 0, 3100)  # MinCellVolt = 3100 mV
+    struct.pack_into("<h", payload, 2, 3600)  # MaxCellVolt = 3600 mV
+    struct.pack_into("<h", payload, 20, 3350)  # AvgCellVolt = 3350 mV
+    payload[6] = 55  # MinCellTemp = 55-40 = 15°C
+    payload[7] = 75  # MaxCellTemp = 75-40 = 35°C
+    payload[22] = 65  # AvgCellTemp = 65-40 = 25°C
+    payload[25] = 4  # NumOfCellsInBypass = 4
+    payload[27] = 16  # NumOfCellsActive = 16
+    payload[28] = 16  # NumOfCellsInSystem = 16
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_STATUS_RAPID
+    assert pkt.data["min_cell_voltage_mv"] == 3100
+    assert pkt.data["max_cell_voltage_mv"] == 3600
+    assert pkt.data["avg_cell_voltage_mv"] == 3350
+    assert pkt.data["min_cell_temp_c"] == pytest.approx(15.0)
+    assert pkt.data["max_cell_temp_c"] == pytest.approx(35.0)
+    assert pkt.data["avg_cell_temp_c"] == pytest.approx(25.0)
+    assert pkt.data["cells_in_bypass"] == 4
+    assert pkt.data["cells_active"] == 16
+    assert pkt.data["cells_in_system"] == 16
+
+
+def test_status_rapid_v2_parses_shunt_power():
+    header = make_header(MSG_STATUS_RAPID)
+    payload = bytearray(42)
+    struct.pack_into("<f", payload, 34, 12500.0)  # ShuntCurrent = 12500 mA
+    struct.pack_into("<f", payload, 38, 3200.0)  # ShuntPowerVA = 3200 W
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.data["shunt_current_ma"] == pytest.approx(12500.0)
+    assert pkt.data["shunt_power_w"] == pytest.approx(3200.0)
+
+
+# ---------------------------------------------------------------------------
+# HW Shunt Metrics v2 (0x7832)
+# ---------------------------------------------------------------------------
+
+
+def test_hw_shunt_metric_v2_parses_soc_cycles_and_flags():
+    header = make_header(MSG_HW_SHUNT_METRIC)
+    payload = bytearray(24)
+    payload[1] = 0b00000011  # hasShuntSocCountLo=True, hasShuntSocCountHi=True
+    struct.pack_into("<h", payload, 2, 42)  # ShuntSocCycles = 42
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_HW_SHUNT_METRIC
+    assert pkt.data["shunt_soc_cycles"] == 42
+    assert pkt.data["has_shunt_soc_count_lo"] is True
+    assert pkt.data["has_shunt_soc_count_hi"] is True
+
+
+def test_hw_shunt_metric_v2_parses_recal_timestamps():
+    header = make_header(MSG_HW_SHUNT_METRIC)
+    payload = bytearray(24)
+    struct.pack_into("<I", payload, 4, 1_700_000_000)  # RecentTimeAcculmSave
+    struct.pack_into("<I", payload, 8, 1_710_000_000)  # RecentTimeSocLoRecal
+    struct.pack_into("<I", payload, 12, 1_720_000_000)  # RecentTimeSocHiRecal
+    struct.pack_into("<I", payload, 16, 1_730_000_000)  # RecentTimeSocCountLo
+    struct.pack_into("<I", payload, 20, 1_740_000_000)  # RecentTimeSocCountHi
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.data["shunt_ts_accum_save"] == 1_700_000_000
+    assert pkt.data["shunt_ts_soc_lo_recal"] == 1_710_000_000
+    assert pkt.data["shunt_ts_soc_hi_recal"] == 1_720_000_000
+    assert pkt.data["shunt_ts_soc_count_lo"] == 1_730_000_000
+    assert pkt.data["shunt_ts_soc_count_hi"] == 1_740_000_000
+
+
+# ---------------------------------------------------------------------------
+# Life Metric v3 (0x5633) and Life Metric A (0x5635)
+# ---------------------------------------------------------------------------
+
+
+def test_life_metric_v3_parses_counts():
+    header = make_header(MSG_LIFE_METRIC_V3)
+    payload = bytearray(86)
+    struct.pack_into("<I", payload, 4, 1500)  # LifeCountStartup = 1500
+    struct.pack_into("<I", payload, 8, 200)  # LifeCountCriticalBattOk = 200
+    struct.pack_into("<I", payload, 12, 800)  # LifeCountChargeOn = 800
+    struct.pack_into("<I", payload, 16, 50)  # LifeCountChargeLimp = 50
+    struct.pack_into("<I", payload, 20, 780)  # LifeCountDischgOn = 780
+    struct.pack_into("<I", payload, 24, 30)  # LifeCountDischgLimp = 30
+    struct.pack_into("<I", payload, 28, 12)  # LifeCountHeatOn = 12
+    struct.pack_into("<I", payload, 32, 8)  # LifeCountCoolOn = 8
+    struct.pack_into("<h", payload, 36, 365)  # LifeCountDailySession = 365
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_LIFE_METRIC_V3
+    assert pkt.data["lifetime_count_startup"] == 1500
+    assert pkt.data["lifetime_count_critical_ok"] == 200
+    assert pkt.data["lifetime_count_charge_on"] == 800
+    assert pkt.data["lifetime_count_charge_limp"] == 50
+    assert pkt.data["lifetime_count_discharge_on"] == 780
+    assert pkt.data["lifetime_count_discharge_limp"] == 30
+    assert pkt.data["lifetime_count_heat_on"] == 12
+    assert pkt.data["lifetime_count_cool_on"] == 8
+    assert pkt.data["lifetime_count_daily_sessions"] == 365
+
+
+def test_life_metric_v3_parses_timestamps():
+    header = make_header(MSG_LIFE_METRIC_V3)
+    payload = bytearray(86)
+    struct.pack_into("<I", payload, 38, 1_700_100_000)  # RecentTimeCriticalOn
+    struct.pack_into("<I", payload, 46, 1_700_200_000)  # RecentTimeChargeOn
+    struct.pack_into("<I", payload, 70, 1_700_300_000)  # RecentTimeHeatOn
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.data["lifetime_ts_critical_on"] == 1_700_100_000
+    assert pkt.data["lifetime_ts_charge_on"] == 1_700_200_000
+    assert pkt.data["lifetime_ts_heat_on"] == 1_700_300_000
+
+
+def test_life_metric_a_shares_same_parser():
+    """0x5635 is dispatched to the same parser as 0x5633."""
+    header = make_header(MSG_LIFE_METRIC_A)
+    payload = bytearray(87)  # 95 bytes total (extra LifetimeSetupVers byte)
+    struct.pack_into("<I", payload, 12, 999)  # LifeCountChargeOn
+    struct.pack_into("<I", payload, 28, 7)  # LifeCountHeatOn
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_LIFE_METRIC_A
+    assert pkt.data["lifetime_count_charge_on"] == 999
+    assert pkt.data["lifetime_count_heat_on"] == 7
+
+
+# ---------------------------------------------------------------------------
+# Life Metric B (0x5634)
+# ---------------------------------------------------------------------------
+
+
+def test_life_metric_b_parses_soc_limit_counts():
+    header = make_header(MSG_LIFE_METRIC_B)
+    payload = bytearray(96)
+    struct.pack_into("<I", payload, 24, 42)  # LifeCountSocLimit1
+    struct.pack_into("<I", payload, 36, 18)  # LifeCountSocLimit2
+    struct.pack_into("<I", payload, 48, 5)  # LifeCountSocLimit3
+    struct.pack_into("<I", payload, 60, 2)  # LifeCountSocLimit4
+    struct.pack_into("<I", payload, 72, 10)  # LifeCountAltChargeOn
+    struct.pack_into("<I", payload, 84, 6)  # LifeCountAltDischgOn
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_LIFE_METRIC_B
+    assert pkt.data["lifetime_count_soc_limit1"] == 42
+    assert pkt.data["lifetime_count_soc_limit2"] == 18
+    assert pkt.data["lifetime_count_soc_limit3"] == 5
+    assert pkt.data["lifetime_count_soc_limit4"] == 2
+    assert pkt.data["lifetime_count_alt_charge_on"] == 10
+    assert pkt.data["lifetime_count_alt_dischg_on"] == 6
+
+
+def test_life_metric_b_parses_timestamps():
+    header = make_header(MSG_LIFE_METRIC_B)
+    payload = bytearray(96)
+    struct.pack_into("<I", payload, 28, 1_710_000_000)  # RecentTimeSocLimit1On
+    struct.pack_into("<I", payload, 32, 1_710_100_000)  # RecentTimeSocLimit1Off
+    struct.pack_into("<I", payload, 76, 1_720_000_000)  # RecentTimeAltChargeOn
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.data["lifetime_ts_soc_limit1_on"] == 1_710_000_000
+    assert pkt.data["lifetime_ts_soc_limit1_off"] == 1_710_100_000
+    assert pkt.data["lifetime_ts_alt_charge_on"] == 1_720_000_000
+
+
+# ---------------------------------------------------------------------------
+# Session Metrics (0x5431)
+# ---------------------------------------------------------------------------
+
+
+def test_session_metrics_parses_record_counts():
+    header = make_header(MSG_SESSION_METRICS)
+    payload = bytearray(17)
+    struct.pack_into("<I", payload, 0, 1_750_000_000)  # QuickSessRecentTime
+    struct.pack_into("<h", payload, 4, 96)  # QuickSessNumOfRecords
+    struct.pack_into("<h", payload, 6, 288)  # QuickSessMaxNumOfRecords
+    struct.pack_into("<I", payload, 8, 300_000)  # QuickSessionInterval = 300 s
+    payload[12] = 1  # AllowQuickSession = True
+    struct.pack_into("<h", payload, 13, 30)  # DailySessNumOfRecords
+    struct.pack_into("<h", payload, 15, 365)  # DailySessMaxNumOfRecords
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_SESSION_METRICS
+    assert pkt.data["quick_session_recent_time"] == 1_750_000_000
+    assert pkt.data["quick_session_num_records"] == 96
+    assert pkt.data["quick_session_max_records"] == 288
+    assert pkt.data["quick_session_interval_s"] == pytest.approx(300.0)
+    assert pkt.data["quick_session_enabled"] is True
+    assert pkt.data["daily_session_num_records"] == 30
+    assert pkt.data["daily_session_max_records"] == 365
 
 
 # ---------------------------------------------------------------------------

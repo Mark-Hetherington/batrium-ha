@@ -22,6 +22,7 @@ from .const import (
     MSG_COMMS_STATUS_V1,
     MSG_DAILY_SESSION,
     MSG_DAILY_SESSION_FULL,
+    MSG_HW_SHUNT_METRIC,
     MSG_HW_SYSTEM_SETUP_FULL,
     MSG_INTEGRATION_SETUP_FULL,
     MSG_LEGACY_CELL_FULL,
@@ -30,14 +31,19 @@ from .const import (
     MSG_LEGACY_LOGIC,
     MSG_LEGACY_REMOTE,
     MSG_LIFE_METRIC,
+    MSG_LIFE_METRIC_A,
+    MSG_LIFE_METRIC_B,
+    MSG_LIFE_METRIC_V3,
     MSG_LIVE_DISPLAY,
-    MSG_NETWORK_SETUP,
     MSG_LOGIC_CONTROL,
+    MSG_NETWORK_SETUP,
     MSG_REMOTE_SETUP_FULL,
     MSG_REMOTE_STATUS,
+    MSG_SESSION_METRICS,
     MSG_SHUNT_METRIC,
     MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
+    MSG_STATUS_RAPID,
     MSG_SYSTEM_DISCO,
     MSG_SYSTEM_SETUP,
     MSG_TELEMETRY_FAST,
@@ -142,6 +148,68 @@ def _parse_rapid(p: bytes) -> dict:
         "shunt_current_ma": shunt_a,
         "shunt_rx_ticks": shunt_rx_ticks,
         "shunt_tx_ticks": shunt_tx_ticks,
+    }
+
+
+def _parse_rapid_v2(p: bytes) -> dict:
+    """0x3E32 - Status Rapid v2 (50 bytes, 300 ms). Same layout as 0x3E5A plus ShuntPower."""
+    o = OFFSET_PAYLOAD
+    min_cell_v = struct.unpack_from("<h", p, o + 0)[0]  # offset 8
+    max_cell_v = struct.unpack_from("<h", p, o + 2)[0]  # offset 10
+    min_cell_v_ref = p[o + 4]  # offset 12
+    max_cell_v_ref = p[o + 5]  # offset 13
+    min_cell_t = _decode_temp(p[o + 6])  # offset 14
+    max_cell_t = _decode_temp(p[o + 7])  # offset 15
+    min_cell_t_ref = p[o + 8]  # offset 16
+    max_cell_t_ref = p[o + 9]  # offset 17
+    min_bp_cur = struct.unpack_from("<h", p, o + 10)[0]  # offset 18
+    max_bp_cur = struct.unpack_from("<h", p, o + 12)[0]  # offset 20
+    min_bp_cur_ref = p[o + 14]  # offset 22
+    max_bp_cur_ref = p[o + 15]  # offset 23
+    min_bp_t = _decode_temp(p[o + 16])  # offset 24
+    max_bp_t = _decode_temp(p[o + 17])  # offset 25
+    min_bp_t_ref = p[o + 18]  # offset 26
+    max_bp_t_ref = p[o + 19]  # offset 27
+    avg_cell_v = struct.unpack_from("<h", p, o + 20)[0]  # offset 28
+    avg_cell_t = _decode_temp(p[o + 22])  # offset 30
+    cells_init_bp = p[o + 23]  # offset 31
+    cells_final_bp = p[o + 24]  # offset 32
+    cells_in_bp = p[o + 25]  # offset 33
+    cells_overdue = p[o + 26]  # offset 34
+    cells_active = p[o + 27]  # offset 35
+    cells_in_sys = p[o + 28]  # offset 36
+    shunt_v = struct.unpack_from("<h", p, o + 32)[0]  # offset 40
+    shunt_a = struct.unpack_from("<f", p, o + 34)[0]  # offset 42 (float mA)
+    shunt_pwr = struct.unpack_from("<f", p, o + 38)[0]  # offset 46 (float W)
+
+    return {
+        "min_cell_voltage_mv": min_cell_v,
+        "max_cell_voltage_mv": max_cell_v,
+        "avg_cell_voltage_mv": avg_cell_v,
+        "min_cell_voltage_ref": min_cell_v_ref,
+        "max_cell_voltage_ref": max_cell_v_ref,
+        "min_cell_temp_c": min_cell_t,
+        "max_cell_temp_c": max_cell_t,
+        "avg_cell_temp_c": avg_cell_t,
+        "min_cell_temp_ref": min_cell_t_ref,
+        "max_cell_temp_ref": max_cell_t_ref,
+        "min_bypass_current_ma": min_bp_cur,
+        "max_bypass_current_ma": max_bp_cur,
+        "min_bypass_current_ref": min_bp_cur_ref,
+        "max_bypass_current_ref": max_bp_cur_ref,
+        "min_bypass_temp_c": min_bp_t,
+        "max_bypass_temp_c": max_bp_t,
+        "min_bypass_temp_ref": min_bp_t_ref,
+        "max_bypass_temp_ref": max_bp_t_ref,
+        "cells_above_initial_bypass": cells_init_bp,
+        "cells_above_final_bypass": cells_final_bp,
+        "cells_in_bypass": cells_in_bp,
+        "cells_overdue": cells_overdue,
+        "cells_active": cells_active,
+        "cells_in_system": cells_in_sys,
+        "shunt_voltage_raw": shunt_v,
+        "shunt_current_ma": shunt_a,
+        "shunt_power_w": shunt_pwr,
     }
 
 
@@ -444,6 +512,29 @@ def _parse_shunt_metric(p: bytes) -> dict:
     }
 
 
+def _parse_shunt_metric_v2(p: bytes) -> dict:
+    """0x7832 - HW Shunt Metrics v2 (32 bytes, 30 s). SoC cycles + recalibration timestamps."""
+    o = OFFSET_PAYLOAD
+    flags = p[o + 1]  # offset 9
+    soc_cycles = struct.unpack_from("<h", p, o + 2)[0]  # offset 10
+    ts_accum_save = struct.unpack_from("<I", p, o + 4)[0]  # offset 12
+    ts_soc_lo_recal = struct.unpack_from("<I", p, o + 8)[0]  # offset 16
+    ts_soc_hi_recal = struct.unpack_from("<I", p, o + 12)[0]  # offset 20
+    ts_soc_count_lo = struct.unpack_from("<I", p, o + 16)[0]  # offset 24
+    ts_soc_count_hi = struct.unpack_from("<I", p, o + 20)[0]  # offset 28
+
+    return {
+        "shunt_soc_cycles": soc_cycles,
+        "has_shunt_soc_count_lo": bool(flags & 0x01),
+        "has_shunt_soc_count_hi": bool(flags & 0x02),
+        "shunt_ts_accum_save": ts_accum_save,
+        "shunt_ts_soc_lo_recal": ts_soc_lo_recal,
+        "shunt_ts_soc_hi_recal": ts_soc_hi_recal,
+        "shunt_ts_soc_count_lo": ts_soc_count_lo,
+        "shunt_ts_soc_count_hi": ts_soc_count_hi,
+    }
+
+
 def _parse_life_metric(p: bytes) -> dict:
     """0x5632 - Telemetry Lifetime Metrics Info (115 bytes)."""
     o = OFFSET_PAYLOAD
@@ -459,6 +550,131 @@ def _parse_life_metric(p: bytes) -> dict:
         "lifetime_count_charge_on": count_chg_on,
         "lifetime_count_discharge_on": count_dischg_on,
         "lifetime_count_daily_sessions": count_daily,
+    }
+
+
+def _parse_life_metric_v3(p: bytes) -> dict:
+    """0x5633/0x5635 - Lifetime Metrics v3/A (94/95 bytes, 30 s). Superset of 0x5632."""
+    o = OFFSET_PAYLOAD
+    return {
+        # Shared keys with 0x5632
+        "lifetime_count_startup": struct.unpack_from("<I", p, o + 4)[0],  # offset 12
+        "lifetime_count_critical_ok": struct.unpack_from("<I", p, o + 8)[
+            0
+        ],  # offset 16
+        "lifetime_count_charge_on": struct.unpack_from("<I", p, o + 12)[0],  # offset 20
+        "lifetime_count_discharge_on": struct.unpack_from("<I", p, o + 20)[
+            0
+        ],  # offset 28
+        "lifetime_count_daily_sessions": struct.unpack_from("<h", p, o + 36)[
+            0
+        ],  # offset 44
+        # New counts
+        "lifetime_count_charge_limp": struct.unpack_from("<I", p, o + 16)[
+            0
+        ],  # offset 24
+        "lifetime_count_discharge_limp": struct.unpack_from("<I", p, o + 24)[
+            0
+        ],  # offset 32
+        "lifetime_count_heat_on": struct.unpack_from("<I", p, o + 28)[0],  # offset 36
+        "lifetime_count_cool_on": struct.unpack_from("<I", p, o + 32)[0],  # offset 40
+        # Recent event timestamps (epoch seconds)
+        "lifetime_ts_critical_on": struct.unpack_from("<I", p, o + 38)[0],  # offset 46
+        "lifetime_ts_critical_off": struct.unpack_from("<I", p, o + 42)[0],  # offset 50
+        "lifetime_ts_charge_on": struct.unpack_from("<I", p, o + 46)[0],  # offset 54
+        "lifetime_ts_charge_off": struct.unpack_from("<I", p, o + 50)[0],  # offset 58
+        "lifetime_ts_charge_limp": struct.unpack_from("<I", p, o + 54)[0],  # offset 62
+        "lifetime_ts_dischg_on": struct.unpack_from("<I", p, o + 58)[0],  # offset 66
+        "lifetime_ts_dischg_off": struct.unpack_from("<I", p, o + 62)[0],  # offset 70
+        "lifetime_ts_dischg_limp": struct.unpack_from("<I", p, o + 66)[0],  # offset 74
+        "lifetime_ts_heat_on": struct.unpack_from("<I", p, o + 70)[0],  # offset 78
+        "lifetime_ts_heat_off": struct.unpack_from("<I", p, o + 74)[0],  # offset 82
+        "lifetime_ts_cool_on": struct.unpack_from("<I", p, o + 78)[0],  # offset 86
+        "lifetime_ts_cool_off": struct.unpack_from("<I", p, o + 82)[0],  # offset 90
+    }
+
+
+def _parse_life_metric_b(p: bytes) -> dict:
+    """0x5634 - Lifetime Metrics B (104 bytes, 30 s). Bypass test and SoC limit counts."""
+    o = OFFSET_PAYLOAD
+    return {
+        "lifetime_count_soc_limit1": struct.unpack_from("<I", p, o + 24)[
+            0
+        ],  # offset 32
+        "lifetime_count_soc_limit2": struct.unpack_from("<I", p, o + 36)[
+            0
+        ],  # offset 44
+        "lifetime_count_soc_limit3": struct.unpack_from("<I", p, o + 48)[
+            0
+        ],  # offset 56
+        "lifetime_count_soc_limit4": struct.unpack_from("<I", p, o + 60)[
+            0
+        ],  # offset 68
+        "lifetime_count_alt_charge_on": struct.unpack_from("<I", p, o + 72)[
+            0
+        ],  # offset 80
+        "lifetime_count_alt_dischg_on": struct.unpack_from("<I", p, o + 84)[
+            0
+        ],  # offset 92
+        # Timestamps
+        "lifetime_ts_soc_limit1_on": struct.unpack_from("<I", p, o + 28)[
+            0
+        ],  # offset 36
+        "lifetime_ts_soc_limit1_off": struct.unpack_from("<I", p, o + 32)[
+            0
+        ],  # offset 40
+        "lifetime_ts_soc_limit2_on": struct.unpack_from("<I", p, o + 40)[
+            0
+        ],  # offset 48
+        "lifetime_ts_soc_limit2_off": struct.unpack_from("<I", p, o + 44)[
+            0
+        ],  # offset 52
+        "lifetime_ts_soc_limit3_on": struct.unpack_from("<I", p, o + 52)[
+            0
+        ],  # offset 60
+        "lifetime_ts_soc_limit3_off": struct.unpack_from("<I", p, o + 56)[
+            0
+        ],  # offset 64
+        "lifetime_ts_soc_limit4_on": struct.unpack_from("<I", p, o + 64)[
+            0
+        ],  # offset 72
+        "lifetime_ts_soc_limit4_off": struct.unpack_from("<I", p, o + 68)[
+            0
+        ],  # offset 76
+        "lifetime_ts_alt_charge_on": struct.unpack_from("<I", p, o + 76)[
+            0
+        ],  # offset 84
+        "lifetime_ts_alt_charge_off": struct.unpack_from("<I", p, o + 80)[
+            0
+        ],  # offset 88
+        "lifetime_ts_alt_dischg_on": struct.unpack_from("<I", p, o + 88)[
+            0
+        ],  # offset 96
+        "lifetime_ts_alt_dischg_off": struct.unpack_from("<I", p, o + 92)[
+            0
+        ],  # offset 100
+    }
+
+
+def _parse_session_metrics(p: bytes) -> dict:
+    """0x5431 - Session Metrics (25 bytes, 30 s). Quick/daily session record counts."""
+    o = OFFSET_PAYLOAD
+    quick_recent_time = struct.unpack_from("<I", p, o + 0)[0]  # offset 8
+    quick_num = struct.unpack_from("<h", p, o + 4)[0]  # offset 12
+    quick_max = struct.unpack_from("<h", p, o + 6)[0]  # offset 14
+    quick_interval_ms = struct.unpack_from("<I", p, o + 8)[0]  # offset 16
+    quick_enabled = bool(p[o + 12])  # offset 20
+    daily_num = struct.unpack_from("<h", p, o + 13)[0]  # offset 21
+    daily_max = struct.unpack_from("<h", p, o + 15)[0]  # offset 23
+
+    return {
+        "quick_session_recent_time": quick_recent_time,
+        "quick_session_num_records": quick_num,
+        "quick_session_max_records": quick_max,
+        "quick_session_interval_s": quick_interval_ms / 1000.0,
+        "quick_session_enabled": quick_enabled,
+        "daily_session_num_records": daily_num,
+        "daily_session_max_records": daily_max,
     }
 
 
@@ -943,6 +1159,7 @@ def _parse_status_control_logic(p: bytes) -> dict:
 _DISPATCH: dict[int, Any] = {
     MSG_LIVE_DISPLAY: _parse_live_display,
     MSG_CELL_STATS: _parse_cell_stats,
+    MSG_STATUS_RAPID: _parse_rapid_v2,
     MSG_TELEMETRY_RAPID: _parse_rapid,
     MSG_SHUNT_STATUS: _parse_shunt_status,
     MSG_TELEMETRY_FAST: _parse_fast,
@@ -963,11 +1180,16 @@ _DISPATCH: dict[int, Any] = {
     MSG_INTEGRATION_SETUP_FULL: _parse_integration_setup_full,
     MSG_REMOTE_SETUP_FULL: _parse_remote_setup_full,
     MSG_THERMAL_SETUP_FULL: _parse_thermal_setup_full,
+    MSG_HW_SHUNT_METRIC: _parse_shunt_metric_v2,
     MSG_SHUNT_METRIC: _parse_shunt_metric,
     MSG_COMMS_STATUS: _parse_comms_status,
     MSG_COMMS_STATUS_V1: _parse_comms_status,
     MSG_COMMS_STATUS_FULL: _parse_comms_status_full,
     MSG_LIFE_METRIC: _parse_life_metric,
+    MSG_LIFE_METRIC_V3: _parse_life_metric_v3,
+    MSG_LIFE_METRIC_A: _parse_life_metric_v3,
+    MSG_LIFE_METRIC_B: _parse_life_metric_b,
+    MSG_SESSION_METRICS: _parse_session_metrics,
     MSG_CELL_FULL_INFO: _parse_cell_full_info,
     MSG_LEGACY_CELL_FULL: _parse_cell_full_info,
     MSG_CELL_BASIC_STATUS: _parse_cell_basic_status,
