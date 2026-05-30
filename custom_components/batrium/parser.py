@@ -30,6 +30,7 @@ from .const import (
     MSG_LIFE_METRIC,
     MSG_LIVE_DISPLAY,
     MSG_LOGIC_CONTROL,
+    MSG_REMOTE_SETUP_FULL,
     MSG_REMOTE_STATUS,
     MSG_SHUNT_METRIC,
     MSG_SHUNT_STATUS,
@@ -714,6 +715,53 @@ def _parse_daily_session_full(p: bytes) -> dict:
     }
 
 
+def _parse_remote_setup_full(p: bytes) -> dict:
+    """0x4E33 - Control Remote Setup (66 bytes, 40 s)."""
+    o = OFFSET_PAYLOAD
+    chg_norm_volt = struct.unpack_from("<h", p, o + 0)[0]
+    chg_norm_amp = struct.unpack_from("<h", p, o + 2)[0]
+    chg_limp_volt = struct.unpack_from("<h", p, o + 6)[0]
+    chg_limp_amp = struct.unpack_from("<h", p, o + 8)[0]
+    dischg_norm_volt = struct.unpack_from("<h", p, o + 18)[0]
+    dischg_norm_amp = struct.unpack_from("<h", p, o + 20)[0]
+    dischg_limp_volt = struct.unpack_from("<h", p, o + 24)[0]
+    dischg_limp_amp = struct.unpack_from("<h", p, o + 26)[0]
+    template_no = p[o + 37]
+    chg_ramp1_amp = struct.unpack_from("<h", p, o + 38)[0]
+    chg_ramp2_amp = struct.unpack_from("<h", p, o + 40)[0]
+    chg_ramp3_amp = struct.unpack_from("<h", p, o + 42)[0]
+    chg_ramp1_soc = _decode_soc(p[o + 44])
+    chg_ramp2_soc = _decode_soc(p[o + 45])
+    chg_ramp3_soc = _decode_soc(p[o + 46])
+    chg_limp_soc = _decode_soc(p[o + 47])
+    dischg_ramp1_amp = struct.unpack_from("<h", p, o + 48)[0]
+    dischg_ramp2_amp = struct.unpack_from("<h", p, o + 50)[0]
+    dischg_ramp3_amp = struct.unpack_from("<h", p, o + 52)[0]
+    dischg_limp_soc = _decode_soc(p[o + 57])
+    return {
+        "remote_charge_target_norm_volt": chg_norm_volt,
+        "remote_charge_target_norm_amp": chg_norm_amp,
+        "remote_charge_target_limp_volt": chg_limp_volt,
+        "remote_charge_target_limp_amp": chg_limp_amp,
+        "remote_dischg_target_norm_volt": dischg_norm_volt,
+        "remote_dischg_target_norm_amp": dischg_norm_amp,
+        "remote_dischg_target_limp_volt": dischg_limp_volt,
+        "remote_dischg_target_limp_amp": dischg_limp_amp,
+        "remote_template_no": template_no,
+        "remote_charge_ramp1_amp": chg_ramp1_amp,
+        "remote_charge_ramp2_amp": chg_ramp2_amp,
+        "remote_charge_ramp3_amp": chg_ramp3_amp,
+        "remote_charge_ramp1_soc_pct": chg_ramp1_soc,
+        "remote_charge_ramp2_soc_pct": chg_ramp2_soc,
+        "remote_charge_ramp3_soc_pct": chg_ramp3_soc,
+        "remote_charge_limp_soc_pct": chg_limp_soc,
+        "remote_dischg_ramp1_amp": dischg_ramp1_amp,
+        "remote_dischg_ramp2_amp": dischg_ramp2_amp,
+        "remote_dischg_ramp3_amp": dischg_ramp3_amp,
+        "remote_dischg_limp_soc_pct": dischg_limp_soc,
+    }
+
+
 def _parse_thermal_setup_full(p: bytes) -> dict:
     """0x5233 - Control Thermal Setup (40 bytes, 22 s)."""
     o = OFFSET_PAYLOAD
@@ -873,6 +921,7 @@ _DISPATCH: dict[int, Any] = {
     MSG_HW_SYSTEM_SETUP_FULL: _parse_hw_system_setup_full,
     MSG_DAILY_SESSION: _parse_daily_session,
     MSG_DAILY_SESSION_FULL: _parse_daily_session_full,
+    MSG_REMOTE_SETUP_FULL: _parse_remote_setup_full,
     MSG_THERMAL_SETUP_FULL: _parse_thermal_setup_full,
     MSG_SHUNT_METRIC: _parse_shunt_metric,
     MSG_COMMS_STATUS: _parse_comms_status,

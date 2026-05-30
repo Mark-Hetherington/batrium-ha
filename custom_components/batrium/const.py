@@ -26,6 +26,7 @@ MSG_SHUNT_STATUS = 0x3F34  # Freq B: 300 ms, shunt power + precision SoC
 MSG_TELEMETRY_FAST = 0x3F33  # Freq C: 1.55s
 MSG_SYSTEM_DISCO = 0x5732  # Freq C: 1.55s
 MSG_HW_SYSTEM_SETUP_FULL = 0x4A36  # Freq D: 30 s, system setup v6 + quick session
+MSG_REMOTE_SETUP_FULL = 0x4E33  # Freq D: 40 s, remote charge/discharge targets
 MSG_LOGIC_CONTROL = 0x4732  # Freq C: 1.55s
 MSG_STATUS_CONTROL_LOGIC = 0x4733  # Freq C: ~2s, compact logic status
 MSG_REMOTE_STATUS = 0x4932  # Freq C: 1.55s

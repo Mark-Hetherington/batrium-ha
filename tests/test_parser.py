@@ -11,6 +11,7 @@ from custom_components.batrium.const import (
     MSG_DAILY_SESSION_FULL,
     MSG_HW_SYSTEM_SETUP_FULL,
     MSG_LIVE_DISPLAY,
+    MSG_REMOTE_SETUP_FULL,
     MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
     MSG_SYSTEM_DISCO,
@@ -474,6 +475,56 @@ def test_hw_system_setup_full_parses_identity_and_quick_session():
     assert pkt.data["serial_number"] == 987654
     assert pkt.data["quick_session_enabled"] is True
     assert pkt.data["quick_session_interval_s"] == pytest.approx(300.0)
+
+
+# ---------------------------------------------------------------------------
+# Remote Setup (0x4E33)
+# ---------------------------------------------------------------------------
+
+
+def test_remote_setup_full_parses_targets_and_soc_thresholds():
+    header = make_header(MSG_REMOTE_SETUP_FULL)
+    payload = bytearray(58)
+    struct.pack_into("<h", payload, 0, 5600)  # chg norm volt = 5600
+    struct.pack_into("<h", payload, 2, 1000)  # chg norm amp = 1000
+    struct.pack_into("<h", payload, 6, 5400)  # chg limp volt = 5400
+    struct.pack_into("<h", payload, 8, 200)  # chg limp amp = 200
+    struct.pack_into("<h", payload, 18, 4800)  # dischg norm volt = 4800
+    struct.pack_into("<h", payload, 20, 800)  # dischg norm amp = 800
+    struct.pack_into("<h", payload, 24, 4600)  # dischg limp volt = 4600
+    struct.pack_into("<h", payload, 26, 100)  # dischg limp amp = 100
+    payload[37] = 2  # template_no = 2
+    struct.pack_into("<h", payload, 38, 900)  # chg ramp1 amp = 900
+    struct.pack_into("<h", payload, 40, 700)  # chg ramp2 amp = 700
+    struct.pack_into("<h", payload, 42, 400)  # chg ramp3 amp = 400
+    payload[44] = 200  # chg ramp1 soc: _decode_soc(200) = 95%
+    payload[45] = 160  # chg ramp2 soc: _decode_soc(160) = 75%
+    payload[46] = 120  # chg ramp3 soc: _decode_soc(120) = 55%
+    payload[47] = 20  # chg limp soc:  _decode_soc(20) = 5%
+    struct.pack_into("<h", payload, 48, 600)  # dischg ramp1 amp = 600
+    struct.pack_into("<h", payload, 50, 400)  # dischg ramp2 amp = 400
+    struct.pack_into("<h", payload, 52, 200)  # dischg ramp3 amp = 200
+    payload[57] = 30  # dischg limp soc: _decode_soc(30) = 10%
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_REMOTE_SETUP_FULL
+    assert pkt.data["remote_charge_target_norm_volt"] == 5600
+    assert pkt.data["remote_charge_target_norm_amp"] == 1000
+    assert pkt.data["remote_charge_target_limp_volt"] == 5400
+    assert pkt.data["remote_charge_target_limp_amp"] == 200
+    assert pkt.data["remote_dischg_target_norm_volt"] == 4800
+    assert pkt.data["remote_dischg_target_norm_amp"] == 800
+    assert pkt.data["remote_template_no"] == 2
+    assert pkt.data["remote_charge_ramp1_amp"] == 900
+    assert pkt.data["remote_charge_ramp2_amp"] == 700
+    assert pkt.data["remote_charge_ramp3_amp"] == 400
+    assert pkt.data["remote_charge_ramp1_soc_pct"] == pytest.approx(95.0)
+    assert pkt.data["remote_charge_ramp2_soc_pct"] == pytest.approx(75.0)
+    assert pkt.data["remote_charge_ramp3_soc_pct"] == pytest.approx(55.0)
+    assert pkt.data["remote_charge_limp_soc_pct"] == pytest.approx(5.0)
+    assert pkt.data["remote_dischg_ramp1_amp"] == 600
+    assert pkt.data["remote_dischg_limp_soc_pct"] == pytest.approx(10.0)
 
 
 # ---------------------------------------------------------------------------
