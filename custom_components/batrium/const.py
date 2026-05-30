@@ -23,6 +23,7 @@ MSG_TELEMETRY_RAPID = 0x3E5A  # Freq B: 294ms
 MSG_TELEMETRY_FAST = 0x3F33  # Freq C: 1.55s
 MSG_SYSTEM_DISCO = 0x5732  # Freq C: 1.55s
 MSG_LOGIC_CONTROL = 0x4732  # Freq C: 1.55s
+MSG_STATUS_CONTROL_LOGIC = 0x4733  # Freq C: ~2s, compact logic status
 MSG_REMOTE_STATUS = 0x4932  # Freq C: 1.55s
 MSG_TELEMETRY_SLOW = 0x405A  # Freq D: 22s
 MSG_SYSTEM_SETUP = 0x4A33  # Freq D: 22s
@@ -130,6 +131,10 @@ SENSOR_DURATION_TO_EMPTY = "estimated_duration_to_empty_min"
 SENSOR_RECENT_CHARGE_MAH = "recent_charge_mah"
 SENSOR_RECENT_DISCHARGE_MAH = "recent_discharge_mah"
 SENSOR_RECENT_NETT_MAH = "recent_nett_mah"
+
+# --- Status Control Logic (0x4733) ---
+SENSOR_CTRL_CHARGE_POWER_RATE = "ctrl_charge_power_rate_state"
+SENSOR_CTRL_DISCHG_POWER_RATE = "ctrl_dischg_power_rate_state"
 
 # Config flow
 CONF_UDP_PORT = "udp_port"

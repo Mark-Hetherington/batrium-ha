@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, SENSOR_CTRL_CHARGE_POWER_RATE, SENSOR_CTRL_DISCHG_POWER_RATE
 from .coordinator import (
     SIGNAL_BATRIUM_CELL_UPDATE,
     SIGNAL_BATRIUM_UPDATE,
@@ -274,6 +274,21 @@ SYSTEM_SENSORS: tuple[BatriumSensorEntityDescription, ...] = (
         state_key="firmware_version",
         name="Firmware Version",
         icon="mdi:chip",
+    ),
+    # ── Status Control Logic (0x4733) ─────────────────────────────────
+    BatriumSensorEntityDescription(
+        key="ctrl_charge_power_rate",
+        state_key=SENSOR_CTRL_CHARGE_POWER_RATE,
+        name="Charge Power Rate",
+        icon="mdi:battery-charging-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    BatriumSensorEntityDescription(
+        key="ctrl_dischg_power_rate",
+        state_key=SENSOR_CTRL_DISCHG_POWER_RATE,
+        name="Discharge Power Rate",
+        icon="mdi:battery-minus-outline",
+        state_class=SensorStateClass.MEASUREMENT,
     ),
 )
 

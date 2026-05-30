@@ -26,6 +26,7 @@ from .const import (
     MSG_LOGIC_CONTROL,
     MSG_REMOTE_STATUS,
     MSG_SHUNT_METRIC,
+    MSG_STATUS_CONTROL_LOGIC,
     MSG_SYSTEM_DISCO,
     MSG_SYSTEM_SETUP,
     MSG_TELEMETRY_FAST,
@@ -513,6 +514,50 @@ def _parse_cell_full_info(p: bytes) -> dict:
     }
 
 
+def _parse_status_control_logic(p: bytes) -> dict:
+    """0x4733 - Status Control Logic (41 bytes, compact successor to 0x4732)."""
+    o = OFFSET_PAYLOAD
+    crit0 = p[o + 0]
+    crit1 = p[o + 1]
+    heat = p[o + 6]
+    cool = p[o + 7]
+    charge_rate_state = p[o + 8]
+    charge0 = p[o + 10]
+    dischg_rate_state = p[o + 16]
+    dischg0 = p[o + 18]
+    expansion_out = p[o + 24]
+    ain1 = struct.unpack_from("<h", p, o + 28)[0]
+    ain2 = struct.unpack_from("<h", p, o + 30)[0]
+    ticks = p[o + 32]
+    return {
+        # Critical status — reuse existing binary-sensor state_keys
+        "critical_battery_ok": bool(crit0 & 0x01),
+        "critical_has_cells_overdue": bool(crit0 & 0x08),
+        "critical_has_cells_low_voltage": bool(crit0 & 0x10),
+        "critical_has_cells_high_voltage": bool(crit0 & 0x20),
+        "critical_has_supply_volt_low": bool(crit1 & 0x01),
+        "critical_has_supply_volt_high": bool(crit1 & 0x02),
+        # Thermal — reuse existing binary-sensor state_keys
+        "thermal_heat_on": bool(heat & 0x01),
+        "thermal_cool_on": bool(cool & 0x01),
+        # Charge — reuse existing binary-sensor state_keys
+        "charging_is_on": bool(charge0 & 0x01),
+        "ctrl_charge_power_rate_state": charge_rate_state,
+        # Discharge — reuse existing binary-sensor state_keys
+        "discharging_is_on": bool(dischg0 & 0x01),
+        "ctrl_dischg_power_rate_state": dischg_rate_state,
+        # Expansion relays (bits 4-7 of expansion output byte)
+        "expansion_relay1": bool(expansion_out & 0x10),
+        "expansion_relay2": bool(expansion_out & 0x20),
+        "expansion_relay3": bool(expansion_out & 0x40),
+        "expansion_relay4": bool(expansion_out & 0x80),
+        # Expansion analog inputs and timing counter
+        "ctrl_expansion_ain1": ain1,
+        "ctrl_expansion_ain2": ain2,
+        "ctrl_diff_logic_ticks": ticks,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Dispatch table and packet entry point
 # ---------------------------------------------------------------------------
@@ -525,6 +570,7 @@ _DISPATCH: dict[int, Any] = {
     MSG_LEGACY_DISCO: _parse_disco,
     MSG_LOGIC_CONTROL: _parse_logic_control,
     MSG_LEGACY_LOGIC: _parse_logic_control,
+    MSG_STATUS_CONTROL_LOGIC: _parse_status_control_logic,
     MSG_REMOTE_STATUS: _parse_remote_status,
     MSG_LEGACY_REMOTE: _parse_remote_status,
     MSG_TELEMETRY_SLOW: _parse_slow,

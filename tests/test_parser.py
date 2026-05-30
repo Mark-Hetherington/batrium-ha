@@ -5,6 +5,7 @@ import struct
 import pytest
 
 from custom_components.batrium.const import (
+    MSG_STATUS_CONTROL_LOGIC,
     MSG_SYSTEM_DISCO,
     MSG_TELEMETRY_FAST,
     MSG_TELEMETRY_RAPID,
@@ -169,6 +170,44 @@ def test_disco_parses_battery_ok():
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
     assert pkt.data["battery_ok_state"] is True
+
+
+# ---------------------------------------------------------------------------
+# StatusControlLogic (0x4733)  # noqa: ERA001
+# ---------------------------------------------------------------------------
+
+# Real packet captured from a live WatchMon.
+# Battery OK, charging + discharging both ON at Normal Power (rate=4).
+_RAW_4733 = bytes.fromhex(
+    "3a33472ccf1d897e0300000000000000040401800000000004040100000000000000080800000000a7"
+)
+
+
+def test_status_control_logic_parses_real_packet():
+    pkt = parse_packet(_RAW_4733)
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_STATUS_CONTROL_LOGIC
+    assert pkt.data["critical_battery_ok"] is True
+    assert pkt.data["charging_is_on"] is True
+    assert pkt.data["ctrl_charge_power_rate_state"] == 4
+    assert pkt.data["discharging_is_on"] is True
+    assert pkt.data["ctrl_dischg_power_rate_state"] == 4
+    assert pkt.data["thermal_heat_on"] is False
+    assert pkt.data["thermal_cool_on"] is False
+    assert pkt.data["ctrl_diff_logic_ticks"] == 0xA7
+
+
+def test_status_control_logic_critical_flags():
+    """Verify bit extraction for critical fault flags."""
+    header = make_header(MSG_STATUS_CONTROL_LOGIC)
+    payload = bytearray(33)
+    # byte 0 (abs 8): bits 4+5 set → cell low + cell high voltage
+    payload[0] = 0b00110000
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.data["critical_has_cells_low_voltage"] is True
+    assert pkt.data["critical_has_cells_high_voltage"] is True
+    assert pkt.data["critical_battery_ok"] is False
 
 
 # ---------------------------------------------------------------------------
