@@ -1,0 +1,13 @@
+default_config:
+
+homeassistant:
+  debug: true
+
+logger:
+  default: info
+  logs:
+    custom_components.batrium: debug
+
+debugpy:
+  start: true
+  wait: true

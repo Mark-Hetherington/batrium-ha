@@ -13,5 +13,6 @@ coverage.xml
 .ruff_cache
 
 
-# Home Assistant configuration (dev only, not published)
-config/
+# Home Assistant configuration
+config/*
+!config/configuration.yaml
