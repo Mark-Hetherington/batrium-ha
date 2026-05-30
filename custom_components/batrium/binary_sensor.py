@@ -25,7 +25,7 @@ from .sensor import _build_device_info
 
 @dataclass
 class BatriumBinarySensorEntityDescription(BinarySensorEntityDescription):
-    """Extends the standard description with coordinator state dict key and optional inversion."""
+    """Extends the standard description with state dict key and optional inversion."""
 
     state_key: str = ""
     invert: bool = False
@@ -42,7 +42,7 @@ BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
         icon="mdi:shield-alert",
         invert=True,
     ),
-    # critical_battery_ok is True when critical status IS OK, so invert for PROBLEM semantics.
+    # critical_battery_ok is True when OK, so invert for PROBLEM semantics.
     BatriumBinarySensorEntityDescription(
         key="critical_battery_ok",
         state_key="critical_battery_ok",
@@ -159,12 +159,14 @@ async def async_setup_entry(
     def _handle_expansion_check() -> None:
         new_entities = []
         for description in EXPANSION_BINARY_SENSORS:
-            if description.key not in expansion_entities_added:
-                if coordinator.state.get(description.state_key):
-                    expansion_entities_added.add(description.key)
-                    new_entities.append(
-                        BatriumBinarySensor(coordinator, description, entry)
-                    )
+            if (
+                description.key not in expansion_entities_added
+                and coordinator.state.get(description.state_key)
+            ):
+                expansion_entities_added.add(description.key)
+                new_entities.append(
+                    BatriumBinarySensor(coordinator, description, entry)
+                )
         if new_entities:
             async_add_entities(new_entities)
 
@@ -206,7 +208,7 @@ class BatriumBinarySensor(BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return the boolean state, optionally inverted, or None if not yet received."""
+        """Return the boolean state, optionally inverted, or None if absent."""
         val = self._coordinator.state.get(self.entity_description.state_key)
         if val is None:
             return None
