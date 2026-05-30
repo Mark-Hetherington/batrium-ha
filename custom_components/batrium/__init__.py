@@ -8,9 +8,11 @@ exposes battery system data as HA sensors and binary sensors.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
 
 from .const import CONF_UDP_PORT, DEFAULT_UDP_PORT, DOMAIN
 from .coordinator import BatriumCoordinator
@@ -27,8 +29,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         await coordinator.async_start()
-    except OSError as exc:
-        _LOGGER.error("Cannot start Batrium UDP listener: %s", exc)
+    except OSError:
+        _LOGGER.exception("Cannot start Batrium UDP listener")
         return False
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator

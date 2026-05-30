@@ -31,19 +31,24 @@ def mock_hass():
     return hass
 
 
-def test_coordinator_starts_unavailable(mock_hass):
-    coordinator = BatriumCoordinator(mock_hass)
+@pytest.fixture
+def coordinator(mock_hass):
+    coord = BatriumCoordinator(mock_hass)
+    yield coord
+    if coord._timeout_handle:
+        coord._timeout_handle.cancel()
+
+
+def test_coordinator_starts_unavailable(coordinator):
     assert coordinator.available is False
 
 
-def test_coordinator_becomes_available_on_packet(mock_hass):
-    coordinator = BatriumCoordinator(mock_hass)
+def test_coordinator_becomes_available_on_packet(coordinator):
     coordinator.handle_datagram(make_rapid_packet(), ("192.168.1.100", 18542))
     assert coordinator.available is True
 
 
-def test_coordinator_merges_state(mock_hass):
-    coordinator = BatriumCoordinator(mock_hass)
+def test_coordinator_merges_state(coordinator):
     coordinator.handle_datagram(
         make_rapid_packet(min_v=3100, max_v=3500), ("192.168.1.100", 18542)
     )
@@ -51,25 +56,21 @@ def test_coordinator_merges_state(mock_hass):
     assert coordinator.state["max_cell_voltage_mv"] == 3500
 
 
-def test_coordinator_ignores_bad_packet(mock_hass):
-    coordinator = BatriumCoordinator(mock_hass)
+def test_coordinator_ignores_bad_packet(coordinator):
     coordinator.handle_datagram(b"\x00\x00\x00\x00", ("192.168.1.100", 18542))
     assert coordinator.available is False
     assert coordinator.state == {}
 
 
-def test_coordinator_marks_unavailable_on_timeout(mock_hass):
-    coordinator = BatriumCoordinator(mock_hass)
+def test_coordinator_marks_unavailable_on_timeout(coordinator):
     coordinator.handle_datagram(make_rapid_packet(), ("192.168.1.100", 18542))
     assert coordinator.available is True
 
-    # Simulate timeout firing
     coordinator._mark_unavailable()
     assert coordinator.available is False
 
 
-def test_coordinator_recovers_after_timeout(mock_hass):
-    coordinator = BatriumCoordinator(mock_hass)
+def test_coordinator_recovers_after_timeout(coordinator):
     coordinator._mark_unavailable()
     assert coordinator.available is False
 

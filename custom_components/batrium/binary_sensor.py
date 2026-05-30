@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.helpers.entity import DeviceInfo
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import SIGNAL_BATRIUM_UPDATE, BatriumCoordinator
@@ -22,6 +25,8 @@ from .sensor import _build_device_info
 
 @dataclass
 class BatriumBinarySensorEntityDescription(BinarySensorEntityDescription):
+    """Extends the standard description with the coordinator state dict key."""
+
     state_key: str = ""
 
 
@@ -161,6 +166,7 @@ class BatriumBinarySensor(BinarySensorEntity):
         description: BatriumBinarySensorEntityDescription,
         entry: ConfigEntry,
     ) -> None:
+        """Initialize the binary sensor."""
         self.entity_description = description
         self._coordinator = coordinator
         self._entry = entry
@@ -169,20 +175,24 @@ class BatriumBinarySensor(BinarySensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
+        """Return device information for this entity."""
         return _build_device_info(self._coordinator, self._entry)
 
     @property
     def available(self) -> bool:
+        """Return True when the coordinator has received recent data."""
         return self._coordinator.available
 
     @property
     def is_on(self) -> bool | None:
+        """Return the boolean state, or None if not yet received."""
         val = self._coordinator.state.get(self.entity_description.state_key)
         if val is None:
             return None
         return bool(val)
 
     async def async_added_to_hass(self) -> None:
+        """Subscribe to coordinator update signals."""
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass, SIGNAL_BATRIUM_UPDATE, self._handle_update

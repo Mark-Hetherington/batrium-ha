@@ -63,66 +63,13 @@ class BatriumPacket:
     data: dict[str, Any] = field(default_factory=dict)
 
 
-def parse_packet(payload: bytes) -> BatriumPacket | None:
-    """Parse a raw Batrium UDP datagram. Returns None on error."""
-    if len(payload) < 8:
-        return None
-    if payload[0] != UDP_START_HEADER:
-        _LOGGER.debug("Ignoring non-Batrium packet (bad header 0x%02X)", payload[0])
-        return None
-
-    msg_type = struct.unpack_from("<H", payload, OFFSET_MSG_TYPE)[0]
-    system_id = struct.unpack_from("<H", payload, OFFSET_SYSTEM_ID)[0]
-    hub_id = struct.unpack_from("<H", payload, 6)[0]
-
-    pkt = BatriumPacket(raw_msg_type=msg_type, system_id=system_id, hub_id=hub_id)
-
-    try:
-        if msg_type == MSG_TELEMETRY_RAPID:
-            pkt.data = _parse_rapid(payload)
-        elif msg_type in (MSG_TELEMETRY_FAST, MSG_LEGACY_FAST):
-            pkt.data = _parse_fast(payload)
-        elif msg_type in (MSG_SYSTEM_DISCO, MSG_LEGACY_DISCO):
-            pkt.data = _parse_disco(payload)
-        elif msg_type in (MSG_LOGIC_CONTROL, MSG_LEGACY_LOGIC):
-            pkt.data = _parse_logic_control(payload)
-        elif msg_type in (MSG_REMOTE_STATUS, MSG_LEGACY_REMOTE):
-            pkt.data = _parse_remote_status(payload)
-        elif msg_type == MSG_TELEMETRY_SLOW:
-            pkt.data = _parse_slow(payload)
-        elif msg_type == MSG_SYSTEM_SETUP:
-            pkt.data = _parse_system_setup(payload)
-        elif msg_type == MSG_DAILY_SESSION:
-            pkt.data = _parse_daily_session(payload)
-        elif msg_type == MSG_SHUNT_METRIC:
-            pkt.data = _parse_shunt_metric(payload)
-        elif msg_type == MSG_LIFE_METRIC:
-            pkt.data = _parse_life_metric(payload)
-        elif msg_type in (MSG_CELL_FULL_INFO, MSG_LEGACY_CELL_FULL):
-            pkt.data = _parse_cell_full_info(payload)
-        elif msg_type == MSG_CELL_BASIC_STATUS:
-            pkt.data = _parse_cell_basic_status(payload)
-        else:
-            _LOGGER.debug(
-                "Unhandled Batrium message type: 0x%04X  payload(%d)=%s",
-                msg_type,
-                len(payload),
-                payload.hex(),
-            )
-    except (struct.error, IndexError) as exc:
-        _LOGGER.warning("Failed to parse Batrium msg 0x%04X: %s", msg_type, exc)
-        return None
-
-    return pkt
-
-
 # ---------------------------------------------------------------------------
-# Individual message parsers
+# Individual message parsers  (parse_packet is defined after these)
 # ---------------------------------------------------------------------------
 
 
 def _parse_rapid(p: bytes) -> dict:
-    """0x3E5A – Telemetry Combined Status Rapid Info (48 bytes payload)."""
+    """0x3E5A - Telemetry Combined Status Rapid Info (48 bytes payload)."""
     o = OFFSET_PAYLOAD
     min_cell_v = struct.unpack_from("<H", p, o + 0)[0]  # offset 8
     max_cell_v = struct.unpack_from("<H", p, o + 2)[0]  # offset 10
@@ -186,7 +133,7 @@ def _parse_rapid(p: bytes) -> dict:
 
 
 def _parse_fast(p: bytes) -> dict:
-    """0x3F33 – Telemetry Combined Status Fast Info (80 bytes)."""
+    """0x3F33 - Telemetry Combined Status Fast Info (80 bytes)."""
     o = OFFSET_PAYLOAD
     cmu_poller_mode = p[o + 0]  # offset 8
     min_cell_v = struct.unpack_from("<H", p, o + 5)[0]  # offset 13
@@ -246,7 +193,7 @@ def _parse_fast(p: bytes) -> dict:
 
 
 def _parse_disco(p: bytes) -> dict:
-    """0x5732 – System Discovery Information (50 bytes)."""
+    """0x5732 - System Discovery Information (50 bytes)."""
     o = OFFSET_PAYLOAD
     sys_code = p[o : o + 8].rstrip(b"\x00").decode("ascii", errors="replace")
     fw_version = struct.unpack_from("<H", p, o + 8)[0]  # offset 16
@@ -298,7 +245,7 @@ def _parse_disco(p: bytes) -> dict:
 
 
 def _parse_logic_control(p: bytes) -> dict:
-    """0x4732 – Telemetry Logic Control Status Info (79 bytes)."""
+    """0x4732 - Telemetry Logic Control Status Info (79 bytes)."""
     o = OFFSET_PAYLOAD
     return {
         "critical_battery_ok": bool(p[o + 0]),
@@ -336,7 +283,7 @@ def _parse_logic_control(p: bytes) -> dict:
 
 
 def _parse_remote_status(p: bytes) -> dict:
-    """0x4932 – Telemetry Remote Status Info (62 bytes)."""
+    """0x4932 - Telemetry Remote Status Info (62 bytes)."""
     o = OFFSET_PAYLOAD
     charge_actual_temp = p[o + 3]  # offset 11
     charge_target_v = struct.unpack_from("<H", p, o + 4)[0]  # offset 12, 10mV/bit
@@ -358,7 +305,7 @@ def _parse_remote_status(p: bytes) -> dict:
 
 
 def _parse_slow(p: bytes) -> dict:
-    """0x405A – Telemetry Combined Status Slow Info (46 bytes)."""
+    """0x405A - Telemetry Combined Status Slow Info (46 bytes)."""
     o = OFFSET_PAYLOAD
     startup_time = struct.unpack_from("<I", p, o + 0)[0]  # offset 8
     duration_full = struct.unpack_from("<H", p, o + 20)[0]  # offset 28
@@ -382,7 +329,7 @@ def _parse_slow(p: bytes) -> dict:
 
 
 def _parse_system_setup(p: bytes) -> dict:
-    """0x4A33 – Hardware System Setup configuration (68 bytes)."""
+    """0x4A33 - Hardware System Setup configuration (68 bytes)."""
     o = OFFSET_PAYLOAD
     fw_version = struct.unpack_from("<H", p, o + 2)[0]  # offset 10
     hw_version = struct.unpack_from("<H", p, o + 4)[0]  # offset 12
@@ -408,7 +355,7 @@ def _parse_system_setup(p: bytes) -> dict:
 
 
 def _parse_daily_session(p: bytes) -> dict:
-    """0x5457 – Telemetry Daily Session Info (61 bytes)."""
+    """0x5457 - Telemetry Daily Session Info (61 bytes)."""
     o = OFFSET_PAYLOAD
     min_cell_v = struct.unpack_from("<H", p, o + 0)[0]  # offset 8
     max_cell_v = struct.unpack_from("<H", p, o + 2)[0]  # offset 10
@@ -438,7 +385,7 @@ def _parse_daily_session(p: bytes) -> dict:
 
 
 def _parse_shunt_metric(p: bytes) -> dict:
-    """0x7857 – Telemetry Shunt Metric Info (76 bytes)."""
+    """0x7857 - Telemetry Shunt Metric Info (76 bytes)."""
     o = OFFSET_PAYLOAD
     soc_cycles = struct.unpack_from("<H", p, o + 0)[0]  # offset 8
     est_full_min = struct.unpack_from("<H", p, o + 24)[0]  # offset 32
@@ -460,7 +407,7 @@ def _parse_shunt_metric(p: bytes) -> dict:
 
 
 def _parse_life_metric(p: bytes) -> dict:
-    """0x5632 – Telemetry Lifetime Metrics Info (115 bytes)."""
+    """0x5632 - Telemetry Lifetime Metrics Info (115 bytes)."""
     o = OFFSET_PAYLOAD
     count_startup = struct.unpack_from("<I", p, o + 4)[0]  # offset 12
     count_crit_ok = struct.unpack_from("<I", p, o + 8)[0]  # offset 16
@@ -478,7 +425,7 @@ def _parse_life_metric(p: bytes) -> dict:
 
 
 def _parse_cell_basic_status(p: bytes) -> dict:
-    """0x415A – Individual Cells Basic Status (variable length)."""
+    """0x415A - Individual Cells Basic Status (variable length)."""
     o = OFFSET_PAYLOAD
     cmu_rx_node_id = p[o + 0]  # offset 8
     records = p[o + 1]  # offset 9
@@ -526,7 +473,7 @@ def _parse_cell_basic_status(p: bytes) -> dict:
 
 
 def _parse_cell_full_info(p: bytes) -> dict:
-    """0x4232 – Individual Cell Full Info (52 bytes, one cell per packet)."""
+    """0x4232 - Individual Cell Full Info (52 bytes, one cell per packet)."""
     o = OFFSET_PAYLOAD
     node_id = p[o + 0]
     usn = p[o + 1]
@@ -564,3 +511,60 @@ def _parse_cell_full_info(p: bytes) -> dict:
         "serial_number": serial_num,
         "bypass_session_mah": bypass_mah,
     }
+
+
+# ---------------------------------------------------------------------------
+# Dispatch table and packet entry point
+# ---------------------------------------------------------------------------
+
+_DISPATCH: dict[int, Any] = {
+    MSG_TELEMETRY_RAPID: _parse_rapid,
+    MSG_TELEMETRY_FAST: _parse_fast,
+    MSG_LEGACY_FAST: _parse_fast,
+    MSG_SYSTEM_DISCO: _parse_disco,
+    MSG_LEGACY_DISCO: _parse_disco,
+    MSG_LOGIC_CONTROL: _parse_logic_control,
+    MSG_LEGACY_LOGIC: _parse_logic_control,
+    MSG_REMOTE_STATUS: _parse_remote_status,
+    MSG_LEGACY_REMOTE: _parse_remote_status,
+    MSG_TELEMETRY_SLOW: _parse_slow,
+    MSG_SYSTEM_SETUP: _parse_system_setup,
+    MSG_DAILY_SESSION: _parse_daily_session,
+    MSG_SHUNT_METRIC: _parse_shunt_metric,
+    MSG_LIFE_METRIC: _parse_life_metric,
+    MSG_CELL_FULL_INFO: _parse_cell_full_info,
+    MSG_LEGACY_CELL_FULL: _parse_cell_full_info,
+    MSG_CELL_BASIC_STATUS: _parse_cell_basic_status,
+}
+
+
+def parse_packet(payload: bytes) -> BatriumPacket | None:
+    """Parse a raw Batrium UDP datagram. Returns None on error."""
+    if len(payload) < OFFSET_PAYLOAD:
+        return None
+    if payload[0] != UDP_START_HEADER:
+        _LOGGER.debug("Ignoring non-Batrium packet (bad header 0x%02X)", payload[0])
+        return None
+
+    msg_type = struct.unpack_from("<H", payload, OFFSET_MSG_TYPE)[0]
+    system_id = struct.unpack_from("<H", payload, OFFSET_SYSTEM_ID)[0]
+    hub_id = struct.unpack_from("<H", payload, 6)[0]
+
+    pkt = BatriumPacket(raw_msg_type=msg_type, system_id=system_id, hub_id=hub_id)
+
+    try:
+        parser = _DISPATCH.get(msg_type)
+        if parser is not None:
+            pkt.data = parser(payload)
+        else:
+            _LOGGER.debug(
+                "Unhandled Batrium message type: 0x%04X  payload(%d)=%s",
+                msg_type,
+                len(payload),
+                payload.hex(),
+            )
+    except (struct.error, IndexError) as exc:
+        _LOGGER.warning("Failed to parse Batrium msg 0x%04X: %s", msg_type, exc)
+        return None
+
+    return pkt

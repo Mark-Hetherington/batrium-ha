@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -12,7 +12,6 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
     UnitOfTemperature,
@@ -21,7 +20,10 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import (
@@ -335,6 +337,7 @@ class BatriumSensor(SensorEntity):
         description: BatriumSensorEntityDescription,
         entry: ConfigEntry,
     ) -> None:
+        """Initialize the sensor."""
         self.entity_description = description
         self._coordinator = coordinator
         self._entry = entry
@@ -343,14 +346,17 @@ class BatriumSensor(SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
+        """Return device information for this entity."""
         return _build_device_info(self._coordinator, self._entry)
 
     @property
     def available(self) -> bool:
+        """Return True when the coordinator has received recent data."""
         return self._coordinator.available
 
     @property
     def native_value(self) -> Any:
+        """Return the sensor value, applying value_fn if defined."""
         raw = self._coordinator.state.get(self.entity_description.state_key)
         if raw is None:
             return None
@@ -358,6 +364,7 @@ class BatriumSensor(SensorEntity):
         return fn(raw) if fn else raw
 
     async def async_added_to_hass(self) -> None:
+        """Subscribe to coordinator update signals."""
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass, SIGNAL_BATRIUM_UPDATE, self._handle_update
@@ -378,6 +385,7 @@ class BatriumCellSensor(SensorEntity):
         node_id: int,
         entry: ConfigEntry,
     ) -> None:
+        """Initialize the cell sensor for the given node ID."""
         self._coordinator = coordinator
         self._node_id = node_id
         self._entry = entry
@@ -388,10 +396,12 @@ class BatriumCellSensor(SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
+        """Return device information for this entity."""
         return _build_device_info(self._coordinator, self._entry)
 
     @property
     def available(self) -> bool:
+        """Return True when coordinator is available and this cell has been seen."""
         return self._coordinator.available and self._node_id in self._coordinator.cells
 
     @property
@@ -402,6 +412,7 @@ class BatriumCellSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return detailed cell metrics as extra state attributes."""
         cell = self._coordinator.cells.get(self._node_id, {})
         return {
             "node_id": self._node_id,
@@ -416,6 +427,7 @@ class BatriumCellSensor(SensorEntity):
         }
 
     async def async_added_to_hass(self) -> None:
+        """Subscribe to cell update signals."""
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass, SIGNAL_BATRIUM_CELL_UPDATE, self._handle_update

@@ -8,12 +8,15 @@ to all registered listeners (sensor platforms).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import socket
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 from .const import (
     BATRIUM_UDP_PORT,
@@ -40,15 +43,19 @@ class BatriumUDPListener(asyncio.DatagramProtocol):
     """asyncio DatagramProtocol that receives Batrium broadcasts."""
 
     def __init__(self, coordinator: BatriumCoordinator) -> None:
+        """Initialize with the owning coordinator."""
         self._coordinator = coordinator
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+        """Forward a received datagram to the coordinator."""
         self._coordinator.handle_datagram(data, addr)
 
     def error_received(self, exc: Exception) -> None:
+        """Log a transport-layer error."""
         _LOGGER.warning("Batrium UDP error: %s", exc)
 
     def connection_lost(self, exc: Exception | None) -> None:
+        """Log when the UDP transport is closed."""
         _LOGGER.info("Batrium UDP connection lost: %s", exc)
 
 
@@ -56,6 +63,7 @@ class BatriumCoordinator:
     """Manages the UDP socket and holds the latest state."""
 
     def __init__(self, hass: HomeAssistant, port: int = BATRIUM_UDP_PORT) -> None:
+        """Initialize coordinator with the HA instance and UDP port to bind."""
         self.hass = hass
         self.port = port
         self._transport: asyncio.BaseTransport | None = None
@@ -80,13 +88,11 @@ class BatriumCoordinator:
             # Create a socket that can receive broadcast packets
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            try:
+            with contextlib.suppress(AttributeError):
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-            except AttributeError:
-                pass  # Not available on Windows
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             sock.bind(("", self.port))
-            sock.setblocking(False)
+            sock.settimeout(0.0)
 
             transport, _ = await loop.create_datagram_endpoint(
                 lambda: BatriumUDPListener(self),
@@ -94,10 +100,8 @@ class BatriumCoordinator:
             )
             self._transport = transport
             _LOGGER.info("Batrium UDP listener started on port %d", self.port)
-        except OSError as exc:
-            _LOGGER.error(
-                "Failed to open Batrium UDP socket on port %d: %s", self.port, exc
-            )
+        except OSError:
+            _LOGGER.exception("Failed to open Batrium UDP socket on port %d", self.port)
             raise
 
     async def async_stop(self) -> None:
@@ -113,8 +117,8 @@ class BatriumCoordinator:
     # Packet handling
     # ------------------------------------------------------------------
 
-    def handle_datagram(self, data: bytes, addr: tuple[str, int]) -> None:
-        """Called by the protocol when a datagram arrives."""
+    def handle_datagram(self, data: bytes, _addr: tuple[str, int]) -> None:
+        """Parse and process an incoming UDP datagram."""
         packet = parse_packet(data)
         if packet is None:
             return
@@ -186,10 +190,11 @@ class BatriumCoordinator:
 
     def _mark_unavailable(self) -> None:
         if self._available:
-            _LOGGER.warning("Batrium system timed out – marking unavailable")
+            _LOGGER.warning("Batrium system timed out - marking unavailable")
             self._available = False
             async_dispatcher_send(self.hass, SIGNAL_BATRIUM_UPDATE)
 
     @property
     def available(self) -> bool:
+        """Return True when packets have been received within the timeout window."""
         return self._available
