@@ -16,7 +16,10 @@ from .const import (
     CELL_NODE_STATUS,
     MSG_CELL_BASIC_STATUS,
     MSG_CELL_FULL_INFO,
+    MSG_CELL_STATS,
+    MSG_COMMS_STATUS,
     MSG_DAILY_SESSION,
+    MSG_DAILY_SESSION_FULL,
     MSG_LEGACY_CELL_FULL,
     MSG_LEGACY_DISCO,
     MSG_LEGACY_FAST,
@@ -26,6 +29,7 @@ from .const import (
     MSG_LOGIC_CONTROL,
     MSG_REMOTE_STATUS,
     MSG_SHUNT_METRIC,
+    MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
     MSG_SYSTEM_DISCO,
     MSG_SYSTEM_SETUP,
@@ -514,6 +518,143 @@ def _parse_cell_full_info(p: bytes) -> dict:
     }
 
 
+def _parse_cell_stats(p: bytes) -> dict:
+    """0x3E33 - Status Cell Stats (48 bytes, 300 ms)."""
+    o = OFFSET_PAYLOAD
+    min_cv = struct.unpack_from("<h", p, o + 0)[0]
+    max_cv = struct.unpack_from("<h", p, o + 2)[0]
+    min_cv_id = p[o + 4]
+    max_cv_id = p[o + 5]
+    min_ct = _decode_temp(p[o + 6])
+    max_ct = _decode_temp(p[o + 7])
+    min_ba = struct.unpack_from("<h", p, o + 10)[0]
+    max_ba = struct.unpack_from("<h", p, o + 12)[0]
+    avg_cv = struct.unpack_from("<h", p, o + 20)[0]
+    avg_ct = _decode_temp(p[o + 22])
+    cells_above_init = p[o + 23]
+    cells_above_final = p[o + 24]
+    cells_in_bypass = p[o + 25]
+    cells_overdue = p[o + 26]
+    cells_active = p[o + 27]
+    cells_in_system = p[o + 28]
+    min_bp_session = struct.unpack_from("<f", p, o + 30)[0]
+    max_bp_session = struct.unpack_from("<f", p, o + 34)[0]
+    return {
+        # Reuse existing rapid-message state_keys
+        "min_cell_voltage_mv": min_cv,
+        "max_cell_voltage_mv": max_cv,
+        "avg_cell_voltage_mv": avg_cv,
+        "min_cell_temp_c": min_ct,
+        "max_cell_temp_c": max_ct,
+        "avg_cell_temp_c": avg_ct,
+        "min_bypass_current_ma": min_ba,
+        "max_bypass_current_ma": max_ba,
+        "cells_above_initial_bypass": cells_above_init,
+        "cells_above_final_bypass": cells_above_final,
+        "cells_in_bypass": cells_in_bypass,
+        "cells_overdue": cells_overdue,
+        "cells_active": cells_active,
+        "cells_in_system": cells_in_system,
+        # New: node IDs for min/max cell and bypass session energy
+        "min_cell_voltage_node_id": min_cv_id,
+        "max_cell_voltage_node_id": max_cv_id,
+        "min_bypass_session_mah": min_bp_session,
+        "max_bypass_session_mah": max_bp_session,
+    }
+
+
+def _parse_shunt_status(p: bytes) -> dict:
+    """0x3F34 - Status Shunt (50 bytes, 300 ms)."""
+    o = OFFSET_PAYLOAD
+    supply_v_raw = struct.unpack_from("<h", p, o + 0)[0]
+    ambient_t = _decode_temp(p[o + 2])
+    shunt_t = _decode_temp(p[o + 3])
+    shunt_v_raw = struct.unpack_from("<h", p, o + 4)[0]
+    shunt_i = struct.unpack_from("<f", p, o + 6)[0]
+    shunt_pwr = struct.unpack_from("<f", p, o + 10)[0]
+    shunt_soc_raw = struct.unpack_from("<h", p, o + 14)[0]
+    cap_full = struct.unpack_from("<f", p, o + 18)[0]
+    cap_empty = struct.unpack_from("<f", p, o + 22)[0]
+    dur_full = struct.unpack_from("<h", p, o + 26)[0]
+    dur_empty = struct.unpack_from("<h", p, o + 28)[0]
+    avg_chg = struct.unpack_from("<f", p, o + 30)[0]
+    avg_dischg = struct.unpack_from("<f", p, o + 34)[0]
+    return {
+        # Reuse existing state_keys with correct unit conversions
+        "system_supply_voltage_mv": supply_v_raw * 10,
+        "system_ambient_temp_c": ambient_t,
+        "shunt_temp_c": shunt_t,
+        "shunt_voltage": shunt_v_raw * 10,
+        "shunt_current_ma": shunt_i,
+        "shunt_state_of_charge_pct": shunt_soc_raw / 100.0,
+        "shunt_capacity_to_full_mah": cap_full,
+        "shunt_capacity_to_empty_mah": cap_empty,
+        "estimated_duration_to_full_min": dur_full,
+        "estimated_duration_to_empty_min": dur_empty,
+        # New: instantaneous power and average charge/discharge current
+        "shunt_power_w": shunt_pwr,
+        "shunt_accum_avg_charge_a": avg_chg / 1000.0,
+        "shunt_accum_avg_dischg_a": avg_dischg / 1000.0,
+    }
+
+
+def _parse_daily_session_full(p: bytes) -> dict:
+    """0x5432 - Daily Session Full (69 bytes, 20 s). Superset of 0x5457."""
+    o = OFFSET_PAYLOAD
+    min_cv = struct.unpack_from("<h", p, o + 0)[0]
+    max_cv = struct.unpack_from("<h", p, o + 2)[0]
+    min_soc = _decode_soc(p[o + 14])
+    max_soc = _decode_soc(p[o + 15])
+    peak_chg = struct.unpack_from("<h", p, o + 32)[0]
+    peak_dischg = struct.unpack_from("<h", p, o + 34)[0]
+    crit_events = p[o + 36]
+    start_time = struct.unpack_from("<i", p, o + 37)[0]
+    finish_time = struct.unpack_from("<i", p, o + 41)[0]
+    cum_ah_chg = struct.unpack_from("<f", p, o + 45)[0]
+    cum_ah_dischg = struct.unpack_from("<f", p, o + 49)[0]
+    cum_kwh_chg = struct.unpack_from("<f", p, o + 53)[0]
+    cum_kwh_dischg = struct.unpack_from("<f", p, o + 57)[0]
+    return {
+        # Reuse existing daily session state_keys
+        "daily_min_cell_voltage_mv": min_cv,
+        "daily_max_cell_voltage_mv": max_cv,
+        "daily_min_soc_pct": min_soc,
+        "daily_max_soc_pct": max_soc,
+        "daily_peak_charge_a": peak_chg * 0.01,
+        "daily_peak_discharge_a": peak_dischg * 0.01,
+        "daily_critical_events": crit_events,
+        "daily_start_time": start_time,
+        "daily_finish_time": finish_time,
+        "daily_cumulative_charge_mah": cum_ah_chg,
+        "daily_cumulative_discharge_mah": cum_ah_dischg,
+        # New: energy in kWh (raw float / 1000)
+        "daily_cumulative_charge_kwh": cum_kwh_chg / 1000.0,
+        "daily_cumulative_discharge_kwh": cum_kwh_dischg / 1000.0,
+    }
+
+
+def _parse_comms_status(p: bytes) -> dict:
+    """0x6131 - Status Comms (33 bytes, 2 s)."""
+    o = OFFSET_PAYLOAD
+    op_status = p[o + 4]
+    wifi_state = p[o + 10]
+    canbus_status = p[o + 14]
+    shunt_status = p[o + 19]
+    cmu_status = p[o + 23]
+    return {
+        # Reuse existing state_keys
+        "system_op_status": op_status,
+        "system_op_status_text": SYSTEM_OP_STATUS.get(
+            op_status, f"Unknown({op_status})"
+        ),
+        "shunt_status": shunt_status,
+        # New: comms health fields
+        "comms_wifi_state": wifi_state,
+        "comms_canbus_op_status": canbus_status,
+        "comms_cmu_op_status": cmu_status,
+    }
+
+
 def _parse_status_control_logic(p: bytes) -> dict:
     """0x4733 - Status Control Logic (41 bytes, compact successor to 0x4732)."""
     o = OFFSET_PAYLOAD
@@ -563,7 +704,9 @@ def _parse_status_control_logic(p: bytes) -> dict:
 # ---------------------------------------------------------------------------
 
 _DISPATCH: dict[int, Any] = {
+    MSG_CELL_STATS: _parse_cell_stats,
     MSG_TELEMETRY_RAPID: _parse_rapid,
+    MSG_SHUNT_STATUS: _parse_shunt_status,
     MSG_TELEMETRY_FAST: _parse_fast,
     MSG_LEGACY_FAST: _parse_fast,
     MSG_SYSTEM_DISCO: _parse_disco,
@@ -576,7 +719,9 @@ _DISPATCH: dict[int, Any] = {
     MSG_TELEMETRY_SLOW: _parse_slow,
     MSG_SYSTEM_SETUP: _parse_system_setup,
     MSG_DAILY_SESSION: _parse_daily_session,
+    MSG_DAILY_SESSION_FULL: _parse_daily_session_full,
     MSG_SHUNT_METRIC: _parse_shunt_metric,
+    MSG_COMMS_STATUS: _parse_comms_status,
     MSG_LIFE_METRIC: _parse_life_metric,
     MSG_CELL_FULL_INFO: _parse_cell_full_info,
     MSG_LEGACY_CELL_FULL: _parse_cell_full_info,

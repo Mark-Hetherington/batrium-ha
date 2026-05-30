@@ -14,6 +14,9 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     PERCENTAGE,
+    UnitOfElectricCurrent,
+    UnitOfEnergy,
+    UnitOfPower,
     UnitOfTemperature,
     UnitOfTime,
 )
@@ -25,7 +28,23 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, SENSOR_CTRL_CHARGE_POWER_RATE, SENSOR_CTRL_DISCHG_POWER_RATE
+from .const import (
+    DOMAIN,
+    SENSOR_COMMS_CANBUS,
+    SENSOR_COMMS_CMU,
+    SENSOR_COMMS_WIFI_STATE,
+    SENSOR_CTRL_CHARGE_POWER_RATE,
+    SENSOR_CTRL_DISCHG_POWER_RATE,
+    SENSOR_DAILY_CHARGE_KWH,
+    SENSOR_DAILY_DISCHG_KWH,
+    SENSOR_MAX_BYPASS_SESSION,
+    SENSOR_MAX_CELL_VOLT_NODE,
+    SENSOR_MIN_BYPASS_SESSION,
+    SENSOR_MIN_CELL_VOLT_NODE,
+    SENSOR_SHUNT_AVG_CHARGE_A,
+    SENSOR_SHUNT_AVG_DISCHG_A,
+    SENSOR_SHUNT_POWER_W,
+)
 from .coordinator import (
     SIGNAL_BATRIUM_CELL_UPDATE,
     SIGNAL_BATRIUM_UPDATE,
@@ -288,6 +307,101 @@ SYSTEM_SENSORS: tuple[BatriumSensorEntityDescription, ...] = (
         state_key=SENSOR_CTRL_DISCHG_POWER_RATE,
         name="Discharge Power Rate",
         icon="mdi:battery-minus-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    # ── Cell Stats (0x3E33) ────────────────────────────────────────────
+    BatriumSensorEntityDescription(
+        key="min_cell_voltage_node",
+        state_key=SENSOR_MIN_CELL_VOLT_NODE,
+        name="Min Cell Voltage Node",
+        icon="mdi:numeric",
+    ),
+    BatriumSensorEntityDescription(
+        key="max_cell_voltage_node",
+        state_key=SENSOR_MAX_CELL_VOLT_NODE,
+        name="Max Cell Voltage Node",
+        icon="mdi:numeric",
+    ),
+    BatriumSensorEntityDescription(
+        key="min_bypass_session",
+        state_key=SENSOR_MIN_BYPASS_SESSION,
+        name="Min Bypass Session",
+        native_unit_of_measurement=UNIT_MILLIAMPHOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:lightning-bolt-outline",
+    ),
+    BatriumSensorEntityDescription(
+        key="max_bypass_session",
+        state_key=SENSOR_MAX_BYPASS_SESSION,
+        name="Max Bypass Session",
+        native_unit_of_measurement=UNIT_MILLIAMPHOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:lightning-bolt",
+    ),
+    # ── Shunt Status (0x3F34) ──────────────────────────────────────────
+    BatriumSensorEntityDescription(
+        key="shunt_power",
+        state_key=SENSOR_SHUNT_POWER_W,
+        name="Shunt Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    BatriumSensorEntityDescription(
+        key="shunt_avg_charge_current",
+        state_key=SENSOR_SHUNT_AVG_CHARGE_A,
+        name="Avg Charge Current",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:current-dc",
+    ),
+    BatriumSensorEntityDescription(
+        key="shunt_avg_dischg_current",
+        state_key=SENSOR_SHUNT_AVG_DISCHG_A,
+        name="Avg Discharge Current",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:current-dc",
+    ),
+    # ── Daily Session Full (0x5432) ────────────────────────────────────
+    BatriumSensorEntityDescription(
+        key="daily_cumulative_charge_kwh",
+        state_key=SENSOR_DAILY_CHARGE_KWH,
+        name="Daily Charge Energy",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    BatriumSensorEntityDescription(
+        key="daily_cumulative_discharge_kwh",
+        state_key=SENSOR_DAILY_DISCHG_KWH,
+        name="Daily Discharge Energy",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    # ── Comms Status (0x6131) ──────────────────────────────────────────
+    BatriumSensorEntityDescription(
+        key="comms_wifi_state",
+        state_key=SENSOR_COMMS_WIFI_STATE,
+        name="WiFi State",
+        icon="mdi:wifi",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    BatriumSensorEntityDescription(
+        key="comms_canbus_op_status",
+        state_key=SENSOR_COMMS_CANBUS,
+        name="CAN Bus Status",
+        icon="mdi:can",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    BatriumSensorEntityDescription(
+        key="comms_cmu_op_status",
+        state_key=SENSOR_COMMS_CMU,
+        name="CMU Op Status",
+        icon="mdi:chip",
         state_class=SensorStateClass.MEASUREMENT,
     ),
 )

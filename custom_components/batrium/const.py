@@ -19,7 +19,9 @@ OFFSET_PAYLOAD = 8  # Data begins at byte 8
 # Message type identifiers
 MSG_CELL_BASIC_STATUS = 0x415A  # Freq A: 147ms
 MSG_CELL_FULL_INFO = 0x4232  # Freq A: 147ms
+MSG_CELL_STATS = 0x3E33  # Freq B: 300 ms, cell aggregate stats + node IDs
 MSG_TELEMETRY_RAPID = 0x3E5A  # Freq B: 294ms
+MSG_SHUNT_STATUS = 0x3F34  # Freq B: 300 ms, shunt power + precision SoC
 MSG_TELEMETRY_FAST = 0x3F33  # Freq C: 1.55s
 MSG_SYSTEM_DISCO = 0x5732  # Freq C: 1.55s
 MSG_LOGIC_CONTROL = 0x4732  # Freq C: 1.55s
@@ -37,8 +39,10 @@ MSG_DISCHARGE_SETUP = 0x5158  # Freq D: 22s
 MSG_THERMAL_SETUP = 0x5258  # Freq D: 22s
 MSG_INTEGRATION_SETUP = 0x5333  # Freq D: 22s
 MSG_DAILY_SESSION = 0x5457  # Freq D: 22s
+MSG_DAILY_SESSION_FULL = 0x5432  # Freq D: 20 s, daily session with kWh
 MSG_SHUNT_METRIC = 0x7857  # Freq D: 22s
 MSG_LIFE_METRIC = 0x5632  # Freq D: 22s
+MSG_COMMS_STATUS = 0x6131  # Freq C: 2 s, comms link health
 
 # Legacy message types (also handled)
 MSG_LEGACY_FAST = 0x3F5A
@@ -131,6 +135,26 @@ SENSOR_DURATION_TO_EMPTY = "estimated_duration_to_empty_min"
 SENSOR_RECENT_CHARGE_MAH = "recent_charge_mah"
 SENSOR_RECENT_DISCHARGE_MAH = "recent_discharge_mah"
 SENSOR_RECENT_NETT_MAH = "recent_nett_mah"
+
+# --- Cell Stats (0x3E33) ---
+SENSOR_MIN_CELL_VOLT_NODE = "min_cell_voltage_node_id"
+SENSOR_MAX_CELL_VOLT_NODE = "max_cell_voltage_node_id"
+SENSOR_MIN_BYPASS_SESSION = "min_bypass_session_mah"
+SENSOR_MAX_BYPASS_SESSION = "max_bypass_session_mah"
+
+# --- Shunt Status (0x3F34) ---
+SENSOR_SHUNT_POWER_W = "shunt_power_w"
+SENSOR_SHUNT_AVG_CHARGE_A = "shunt_accum_avg_charge_a"
+SENSOR_SHUNT_AVG_DISCHG_A = "shunt_accum_avg_dischg_a"
+
+# --- Daily Session Full (0x5432) ---
+SENSOR_DAILY_CHARGE_KWH = "daily_cumulative_charge_kwh"
+SENSOR_DAILY_DISCHG_KWH = "daily_cumulative_discharge_kwh"
+
+# --- Comms Status (0x6131) ---
+SENSOR_COMMS_WIFI_STATE = "comms_wifi_state"
+SENSOR_COMMS_CANBUS = "comms_canbus_op_status"
+SENSOR_COMMS_CMU = "comms_cmu_op_status"
 
 # --- Status Control Logic (0x4733) ---
 SENSOR_CTRL_CHARGE_POWER_RATE = "ctrl_charge_power_rate_state"

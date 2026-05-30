@@ -5,6 +5,10 @@ import struct
 import pytest
 
 from custom_components.batrium.const import (
+    MSG_CELL_STATS,
+    MSG_COMMS_STATUS,
+    MSG_DAILY_SESSION_FULL,
+    MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
     MSG_SYSTEM_DISCO,
     MSG_TELEMETRY_FAST,
@@ -170,6 +174,142 @@ def test_disco_parses_battery_ok():
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
     assert pkt.data["battery_ok_state"] is True
+
+
+# ---------------------------------------------------------------------------
+# Cell Stats (0x3E33)
+# ---------------------------------------------------------------------------
+
+
+def test_cell_stats_parses_voltages_and_node_ids():
+    header = make_header(MSG_CELL_STATS)
+    payload = bytearray(40)
+    struct.pack_into("<h", payload, 0, 3200)  # MinCellVolt = 3200 mV
+    struct.pack_into("<h", payload, 2, 3600)  # MaxCellVolt = 3600 mV
+    payload[4] = 3  # MinCellVoltId = node 3
+    payload[5] = 11  # MaxCellVoltId = node 11
+    payload[6] = 60  # MinCellTemp = 60-40 = 20°C
+    payload[7] = 65  # MaxCellTemp = 65-40 = 25°C
+    struct.pack_into("<h", payload, 10, 50)  # MinBypassAmp = 50 mA
+    struct.pack_into("<h", payload, 12, 800)  # MaxBypassAmp = 800 mA
+    struct.pack_into("<h", payload, 20, 3400)  # AvgCellVolt = 3400 mV
+    payload[22] = 62  # AvgCellTemp = 62-40 = 22°C
+    payload[23] = 2  # cells_above_initial_bypass
+    payload[24] = 1  # cells_above_final_bypass
+    payload[25] = 1  # cells_in_bypass
+    payload[26] = 0  # cells_overdue
+    payload[27] = 16  # cells_active
+    payload[28] = 16  # cells_in_system
+    struct.pack_into("<f", payload, 30, 1500.0)  # MinBypassSession = 1500 mAh
+    struct.pack_into("<f", payload, 34, 3200.0)  # MaxBypassSession = 3200 mAh
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_CELL_STATS
+    assert pkt.data["min_cell_voltage_mv"] == 3200
+    assert pkt.data["max_cell_voltage_mv"] == 3600
+    assert pkt.data["min_cell_voltage_node_id"] == 3
+    assert pkt.data["max_cell_voltage_node_id"] == 11
+    assert pkt.data["min_cell_temp_c"] == pytest.approx(20.0)
+    assert pkt.data["max_cell_temp_c"] == pytest.approx(25.0)
+    assert pkt.data["avg_cell_voltage_mv"] == 3400
+    assert pkt.data["cells_active"] == 16
+    assert pkt.data["min_bypass_session_mah"] == pytest.approx(1500.0)
+    assert pkt.data["max_bypass_session_mah"] == pytest.approx(3200.0)
+
+
+# ---------------------------------------------------------------------------
+# Shunt Status (0x3F34)
+# ---------------------------------------------------------------------------
+
+
+def test_shunt_status_parses_power_and_precision_soc():
+    header = make_header(MSG_SHUNT_STATUS)
+    payload = bytearray(42)
+    struct.pack_into("<h", payload, 0, 5200)  # SupplyVolt raw=5200 → 52000 mV
+    payload[2] = 65  # AmbientTemp = 65-40 = 25°C
+    payload[3] = 61  # ShuntTemp = 61-40 = 21°C
+    struct.pack_into("<h", payload, 4, 5000)  # ShuntVoltage raw=5000 → 50000 mV
+    struct.pack_into("<f", payload, 6, 15000.0)  # ShuntCurrent = 15000 mA
+    struct.pack_into("<f", payload, 10, 5000.0)  # ShuntPowerVA = 5000 W
+    struct.pack_into("<h", payload, 14, 6050)  # ShuntSOC = 6050/100 = 60.50%
+    struct.pack_into("<f", payload, 18, 100000.0)  # CapacityToFull = 100000 mAh
+    struct.pack_into("<f", payload, 22, 50000.0)  # CapacityToEmpty = 50000 mAh
+    struct.pack_into("<h", payload, 26, 120)  # EstDurationToFull = 120 min
+    struct.pack_into("<h", payload, 28, 60)  # EstDurationToEmpty = 60 min
+    struct.pack_into("<f", payload, 30, 12000.0)  # AvgCharge = 12000 mA → 12 A
+    struct.pack_into("<f", payload, 34, 8000.0)  # AvgDischg = 8000 mA → 8 A
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_SHUNT_STATUS
+    assert pkt.data["system_supply_voltage_mv"] == 52000
+    assert pkt.data["system_ambient_temp_c"] == pytest.approx(25.0)
+    assert pkt.data["shunt_current_ma"] == pytest.approx(15000.0)
+    assert pkt.data["shunt_power_w"] == pytest.approx(5000.0)
+    assert pkt.data["shunt_state_of_charge_pct"] == pytest.approx(60.50)
+    assert pkt.data["shunt_capacity_to_full_mah"] == pytest.approx(100000.0)
+    assert pkt.data["estimated_duration_to_full_min"] == 120
+    assert pkt.data["shunt_accum_avg_charge_a"] == pytest.approx(12.0)
+    assert pkt.data["shunt_accum_avg_dischg_a"] == pytest.approx(8.0)
+
+
+# ---------------------------------------------------------------------------
+# Daily Session Full (0x5432)
+# ---------------------------------------------------------------------------
+
+
+def test_daily_session_full_parses_kwh():
+    header = make_header(MSG_DAILY_SESSION_FULL)
+    payload = bytearray(61)
+    struct.pack_into("<h", payload, 0, 3100)  # MinCellVolt = 3100 mV
+    struct.pack_into("<h", payload, 2, 3700)  # MaxCellVolt = 3700 mV
+    payload[14] = 120  # MinShuntSoc → 55%
+    payload[15] = 200  # MaxShuntSoc → 95%
+    struct.pack_into("<h", payload, 32, 4500)  # PeakCharge = 4500 * 0.01 = 45 A
+    struct.pack_into("<h", payload, 34, 3000)  # PeakDischg = 3000 * 0.01 = 30 A
+    payload[36] = 2  # CriticalEvents = 2
+    struct.pack_into("<f", payload, 45, 50000.0)  # CumulAhCharge = 50000 mAh
+    struct.pack_into("<f", payload, 49, 48000.0)  # CumulAhDischg = 48000 mAh
+    struct.pack_into("<f", payload, 53, 2500.0)  # CumulkWhCharge → 2.5 kWh
+    struct.pack_into("<f", payload, 57, 2400.0)  # CumulkWhDischg → 2.4 kWh
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_DAILY_SESSION_FULL
+    assert pkt.data["daily_min_cell_voltage_mv"] == 3100
+    assert pkt.data["daily_max_cell_voltage_mv"] == 3700
+    assert pkt.data["daily_min_soc_pct"] == pytest.approx(55.0)
+    assert pkt.data["daily_max_soc_pct"] == pytest.approx(95.0)
+    assert pkt.data["daily_peak_charge_a"] == pytest.approx(45.0)
+    assert pkt.data["daily_critical_events"] == 2
+    assert pkt.data["daily_cumulative_charge_mah"] == pytest.approx(50000.0)
+    assert pkt.data["daily_cumulative_charge_kwh"] == pytest.approx(2.5)
+    assert pkt.data["daily_cumulative_discharge_kwh"] == pytest.approx(2.4)
+
+
+# ---------------------------------------------------------------------------
+# Comms Status (0x6131)
+# ---------------------------------------------------------------------------
+
+
+def test_comms_status_parses_diagnostics():
+    header = make_header(MSG_COMMS_STATUS)
+    payload = bytearray(25)
+    payload[4] = 2  # SystemOpStatus = 2 (Charging)
+    payload[10] = 3  # WifiState = 3
+    payload[14] = 1  # CanbusOpStatus = 1
+    payload[19] = 4  # ShuntStatus = 4 (Charging)
+    payload[23] = 2  # CmuOpStatus = 2
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_COMMS_STATUS
+    assert pkt.data["system_op_status"] == 2
+    assert pkt.data["system_op_status_text"] == "Charging"
+    assert pkt.data["comms_wifi_state"] == 3
+    assert pkt.data["comms_canbus_op_status"] == 1
+    assert pkt.data["comms_cmu_op_status"] == 2
 
 
 # ---------------------------------------------------------------------------
