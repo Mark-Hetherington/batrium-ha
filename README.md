@@ -82,3 +82,7 @@ Integrates a **Batrium WatchMon** battery management system into Home Assistant 
 
 Batrium WatchMon WiFi UDP Protocol v0.5  
 https://wiki.batrium.com/canbus/watchmon-wifi-udp-protocol-v0.5.pdf
+
+## Acknowledgements
+
+This integration was built using the [integration_blueprint](https://github.com/ludeeus/integration_blueprint) template by [@ludeeus](https://github.com/ludeeus) as a structural reference.
