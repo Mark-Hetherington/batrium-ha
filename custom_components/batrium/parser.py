@@ -21,6 +21,7 @@ from .const import (
     MSG_COMMS_STATUS_FULL,
     MSG_DAILY_SESSION,
     MSG_DAILY_SESSION_FULL,
+    MSG_HW_SYSTEM_SETUP_FULL,
     MSG_LEGACY_CELL_FULL,
     MSG_LEGACY_DISCO,
     MSG_LEGACY_FAST,
@@ -359,6 +360,31 @@ def _parse_system_setup(p: bytes) -> dict:
         "system_code": sys_code,
         "system_name": sys_name,
         "asset_code": asset_code,
+    }
+
+
+def _parse_hw_system_setup_full(p: bytes) -> dict:
+    """0x4A36 - HW System Setup v6 (82 bytes, 30 s). Superset of 0x4A33."""
+    o = OFFSET_PAYLOAD
+    fw_version = struct.unpack_from("<h", p, o + 58)[0]
+    hw_version = struct.unpack_from("<h", p, o + 60)[0]
+    serial_num = struct.unpack_from("<I", p, o + 62)[0]
+    sys_code = p[o + 6 : o + 14].rstrip(b"\x00").decode("ascii", errors="replace")
+    sys_name = p[o + 14 : o + 34].rstrip(b"\x00").decode("ascii", errors="replace")
+    asset_code = p[o + 34 : o + 54].rstrip(b"\x00").decode("ascii", errors="replace")
+    quick_session = bool(p[o + 69])
+    quick_interval_ms = struct.unpack_from("<I", p, o + 70)[0]
+    return {
+        # Reuse existing system-setup state_keys
+        "firmware_version": fw_version,
+        "hardware_version": hw_version,
+        "serial_number": serial_num,
+        "system_code": sys_code,
+        "system_name": sys_name,
+        "asset_code": asset_code,
+        # New: quick session configuration
+        "quick_session_enabled": quick_session,
+        "quick_session_interval_s": quick_interval_ms / 1000.0,
     }
 
 
@@ -844,6 +870,7 @@ _DISPATCH: dict[int, Any] = {
     MSG_LEGACY_REMOTE: _parse_remote_status,
     MSG_TELEMETRY_SLOW: _parse_slow,
     MSG_SYSTEM_SETUP: _parse_system_setup,
+    MSG_HW_SYSTEM_SETUP_FULL: _parse_hw_system_setup_full,
     MSG_DAILY_SESSION: _parse_daily_session,
     MSG_DAILY_SESSION_FULL: _parse_daily_session_full,
     MSG_THERMAL_SETUP_FULL: _parse_thermal_setup_full,

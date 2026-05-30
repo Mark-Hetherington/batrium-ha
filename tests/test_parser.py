@@ -9,6 +9,7 @@ from custom_components.batrium.const import (
     MSG_COMMS_STATUS,
     MSG_COMMS_STATUS_FULL,
     MSG_DAILY_SESSION_FULL,
+    MSG_HW_SYSTEM_SETUP_FULL,
     MSG_LIVE_DISPLAY,
     MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
@@ -435,6 +436,44 @@ def test_thermal_setup_full_parses_thresholds():
     assert pkt.data["thermal_cool_hi_ambient_c"] == pytest.approx(40.0)
     assert pkt.data["thermal_cool_hi_cell_cutout_c"] == pytest.approx(55.0)
     assert pkt.data["thermal_cool_hi_ambient_cutout_c"] == pytest.approx(50.0)
+
+
+# ---------------------------------------------------------------------------
+# HW System Setup Full (0x4A36)
+# ---------------------------------------------------------------------------
+
+
+def test_hw_system_setup_full_parses_identity_and_quick_session():
+    header = make_header(MSG_HW_SYSTEM_SETUP_FULL)
+    payload = bytearray(74)
+    # SystemCode at o+6..13
+    payload[6:14] = b"BATRIUM1"
+    # SysName at o+14..33
+    payload[14:28] = b"My Battery Pack"
+    # AssetCode at o+34..53
+    payload[34:42] = b"ASSET001"
+    # FirmwareVersion at o+58..59
+    struct.pack_into("<h", payload, 58, 215)
+    # HardwareVersion at o+60..61
+    struct.pack_into("<h", payload, 60, 3)
+    # SerialNo at o+62..65
+    struct.pack_into("<I", payload, 62, 987654)
+    # AllowQuickSession at o+69
+    payload[69] = 1
+    # QuickSessionInterval at o+70..73 (ms → /1000 = s)
+    struct.pack_into("<I", payload, 70, 300000)  # 300 s
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_HW_SYSTEM_SETUP_FULL
+    assert pkt.data["system_code"] == "BATRIUM1"
+    assert pkt.data["system_name"] == "My Battery Pack"
+    assert pkt.data["asset_code"] == "ASSET001"
+    assert pkt.data["firmware_version"] == 215
+    assert pkt.data["hardware_version"] == 3
+    assert pkt.data["serial_number"] == 987654
+    assert pkt.data["quick_session_enabled"] is True
+    assert pkt.data["quick_session_interval_s"] == pytest.approx(300.0)
 
 
 # ---------------------------------------------------------------------------

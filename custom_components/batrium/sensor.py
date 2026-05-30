@@ -42,6 +42,7 @@ from .const import (
     SENSOR_MAX_CELL_VOLT_NODE,
     SENSOR_MIN_BYPASS_SESSION,
     SENSOR_MIN_CELL_VOLT_NODE,
+    SENSOR_QUICK_SESSION_INTERVAL,
     SENSOR_SHUNT_AVG_CHARGE_A,
     SENSOR_SHUNT_AVG_DISCHG_A,
     SENSOR_SHUNT_CUMUL_CHARGE_KWH,
@@ -321,6 +322,15 @@ SYSTEM_SENSORS: tuple[BatriumSensorEntityDescription, ...] = (
         name="Discharge Power Rate",
         icon="mdi:battery-minus-outline",
         state_class=SensorStateClass.MEASUREMENT,
+    ),
+    # ── HW System Setup Full (0x4A36) ─────────────────────────────────
+    BatriumSensorEntityDescription(
+        key="quick_session_interval",
+        state_key=SENSOR_QUICK_SESSION_INTERVAL,
+        name="Quick Session Interval",
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        icon="mdi:timer-outline",
     ),
     # ── Thermal Setup (0x5233) ────────────────────────────────────────
     BatriumSensorEntityDescription(

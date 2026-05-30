@@ -25,6 +25,7 @@ MSG_TELEMETRY_RAPID = 0x3E5A  # Freq B: 294ms
 MSG_SHUNT_STATUS = 0x3F34  # Freq B: 300 ms, shunt power + precision SoC
 MSG_TELEMETRY_FAST = 0x3F33  # Freq C: 1.55s
 MSG_SYSTEM_DISCO = 0x5732  # Freq C: 1.55s
+MSG_HW_SYSTEM_SETUP_FULL = 0x4A36  # Freq D: 30 s, system setup v6 + quick session
 MSG_LOGIC_CONTROL = 0x4732  # Freq C: 1.55s
 MSG_STATUS_CONTROL_LOGIC = 0x4733  # Freq C: ~2s, compact logic status
 MSG_REMOTE_STATUS = 0x4932  # Freq C: 1.55s
@@ -138,6 +139,9 @@ SENSOR_DURATION_TO_EMPTY = "estimated_duration_to_empty_min"
 SENSOR_RECENT_CHARGE_MAH = "recent_charge_mah"
 SENSOR_RECENT_DISCHARGE_MAH = "recent_discharge_mah"
 SENSOR_RECENT_NETT_MAH = "recent_nett_mah"
+
+# --- HW System Setup Full (0x4A36) ---
+SENSOR_QUICK_SESSION_INTERVAL = "quick_session_interval_s"
 
 # --- Thermal Setup (0x5233) ---
 SENSOR_THERMAL_HEAT_MODE = "thermal_heat_mode"

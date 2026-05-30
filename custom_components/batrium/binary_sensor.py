@@ -96,6 +96,13 @@ BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
         device_class=BinarySensorDeviceClass.PROBLEM,
         icon="mdi:timer-alert",
     ),
+    # ── HW System Setup Full (0x4A36) ─────────────────────────────────
+    BatriumBinarySensorEntityDescription(
+        key="quick_session_enabled",
+        state_key="quick_session_enabled",
+        name="Quick Session Enabled",
+        icon="mdi:timer-play-outline",
+    ),
     # ── Thermal Setup (0x5233) — monitor-enable flags ─────────────────
     BatriumBinarySensorEntityDescription(
         key="thermal_heat_monitor_cell_temp",
