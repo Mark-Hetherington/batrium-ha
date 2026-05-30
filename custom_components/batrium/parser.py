@@ -16,14 +16,14 @@ from .const import (
     CELL_NODE_STATUS,
     MSG_CELL_BASIC_STATUS,
     MSG_CELL_FULL_INFO,
-    MSG_CELL_STATS,
-    MSG_COMMS_STATUS,
-    MSG_COMMS_STATUS_FULL,
-    MSG_COMMS_STATUS_V1,
     MSG_CELL_GROUP_SETUP_V4,
     MSG_CELL_GROUP_SETUP_V5,
     MSG_CELL_GROUP_SETUP_V6,
+    MSG_CELL_STATS,
     MSG_CHARGE_SETUP,
+    MSG_COMMS_STATUS,
+    MSG_COMMS_STATUS_FULL,
+    MSG_COMMS_STATUS_V1,
     MSG_CRITICAL_SETUP,
     MSG_DAILY_SESSION,
     MSG_DAILY_SESSION_FULL,
@@ -49,10 +49,10 @@ from .const import (
     MSG_LIVE_DISPLAY,
     MSG_LOGIC_CONTROL,
     MSG_NETWORK_SETUP,
+    MSG_QUICK_SESSION_HIST,
     MSG_REMOTE_SETUP,
     MSG_REMOTE_SETUP_FULL,
     MSG_REMOTE_STATUS,
-    MSG_QUICK_SESSION_HIST,
     MSG_SESSION_METRICS,
     MSG_SHUNT_METRIC,
     MSG_SHUNT_SETUP,
@@ -172,7 +172,11 @@ def _parse_rapid(p: bytes) -> dict:
 
 
 def _parse_rapid_v2(p: bytes) -> dict:
-    """0x3E32 - Status Rapid v2 (50 bytes, 300 ms). Same layout as 0x3E5A plus ShuntPower."""
+    """
+    0x3E32 - Status Rapid v2 (50 bytes, 300 ms).
+
+    Same layout as 0x3E5A plus ShuntPower.
+    """
     o = OFFSET_PAYLOAD
     min_cell_v = struct.unpack_from("<h", p, o + 0)[0]  # offset 8
     max_cell_v = struct.unpack_from("<h", p, o + 2)[0]  # offset 10
@@ -533,7 +537,11 @@ def _parse_shunt_metric(p: bytes) -> dict:
 
 
 def _parse_shunt_metric_v2(p: bytes) -> dict:
-    """0x7832 - HW Shunt Metrics v2 (32 bytes, 30 s). SoC cycles + recalibration timestamps."""
+    """
+    0x7832 - HW Shunt Metrics v2 (32 bytes, 30 s).
+
+    SoC cycles + recalibration timestamps.
+    """
     o = OFFSET_PAYLOAD
     flags = p[o + 1]  # offset 9
     soc_cycles = struct.unpack_from("<h", p, o + 2)[0]  # offset 10
@@ -615,7 +623,11 @@ def _parse_life_metric_v3(p: bytes) -> dict:
 
 
 def _parse_life_metric_b(p: bytes) -> dict:
-    """0x5634 - Lifetime Metrics B (104 bytes, 30 s). Bypass test and SoC limit counts."""
+    """
+    0x5634 - Lifetime Metrics B (104 bytes, 30 s).
+
+    Bypass test and SoC limit counts.
+    """
     o = OFFSET_PAYLOAD
     return {
         "lifetime_count_soc_limit1": struct.unpack_from("<I", p, o + 24)[
@@ -955,15 +967,15 @@ def _parse_daily_session_full(p: bytes) -> dict:
 
 
 def _parse_network_setup(p: bytes) -> dict:
-    """0x5A32 - Network/Time Setup (96 bytes, undocumented, reverse-engineered)."""
+    """0x5A32 - Network/Time Setup (103 bytes, undocumented, reverse-engineered)."""
     o = OFFSET_PAYLOAD
-    # Bytes 0-7: small config fields
     ntp_enabled = bool(struct.unpack_from("<H", p, o + 4)[0])
     ntp_interval = struct.unpack_from("<H", p, o + 6)[0]
     # Bytes 8-57: POSIX timezone name (null-terminated, 50-byte buffer)
-    tz_name = p[o + 8 : o + 58].rstrip(b"\x00").decode("ascii", errors="replace")
-    # Bytes 58-87: NTP server hostname (null-terminated, 30-byte buffer)
-    ntp_server = p[o + 58 : o + 88].rstrip(b"\x00").decode("ascii", errors="replace")
+    tz_name = p[o + 8 : o + 58].split(b"\x00")[0].decode("ascii", errors="replace")
+    # Bytes 58-60: 3 reserved/unknown bytes (always 0x00 in observed packets)
+    # Bytes 61-90: NTP server hostname (null-terminated, 30-byte buffer)
+    ntp_server = p[o + 61 : o + 91].split(b"\x00")[0].decode("ascii", errors="replace")
     return {
         "ntp_enabled": ntp_enabled,
         "ntp_update_interval": ntp_interval,
@@ -1181,10 +1193,16 @@ def _parse_slow_v2(p: bytes) -> dict:
     """0x4032 - Status Slow v2 (66 bytes, 30 s). Duration estimates + setup versions."""
     o = OFFSET_PAYLOAD
     return {
-        "estimated_duration_to_full_min": struct.unpack_from("<h", p, o + 20)[0],   # offset 28
-        "estimated_duration_to_empty_min": struct.unpack_from("<h", p, o + 22)[0],  # offset 30
-        "shunt_accum_avg_charge_a": struct.unpack_from("<f", p, o + 24)[0] / 1000.0,  # offset 32
-        "shunt_accum_avg_dischg_a": struct.unpack_from("<f", p, o + 28)[0] / 1000.0,  # offset 36
+        "estimated_duration_to_full_min": struct.unpack_from("<h", p, o + 20)[
+            0
+        ],  # offset 28
+        "estimated_duration_to_empty_min": struct.unpack_from("<h", p, o + 22)[
+            0
+        ],  # offset 30
+        "shunt_accum_avg_charge_a": struct.unpack_from("<f", p, o + 24)[0]
+        / 1000.0,  # offset 32
+        "shunt_accum_avg_dischg_a": struct.unpack_from("<f", p, o + 28)[0]
+        / 1000.0,  # offset 36
         "has_shunt_soc_count_lo": bool(p[o + 36]),  # offset 44
         "has_shunt_soc_count_hi": bool(p[o + 37]),  # offset 45
     }
@@ -1194,58 +1212,95 @@ def _parse_slow_v3(p: bytes) -> dict:
     """0x4033 - Status Slow v3 (66 bytes, 30 s). Session records + shunt serial info."""
     o = OFFSET_PAYLOAD
     return {
-        "daily_session_num_records": struct.unpack_from("<h", p, o + 4)[0],    # offset 12
-        "daily_session_max_records": struct.unpack_from("<h", p, o + 6)[0],    # offset 14
-        "quick_session_num_records": struct.unpack_from("<h", p, o + 12)[0],   # offset 20
-        "quick_session_max_records": struct.unpack_from("<h", p, o + 14)[0],   # offset 22
-        "quick_session_interval_s": struct.unpack_from("<I", p, o + 8)[0] / 1000.0,  # offset 16
-        "shunt_setup_nom_capacity_ah": struct.unpack_from("<f", p, o + 18)[0] / 1000.0,  # offset 26
+        "daily_session_num_records": struct.unpack_from("<h", p, o + 4)[0],  # offset 12
+        "daily_session_max_records": struct.unpack_from("<h", p, o + 6)[0],  # offset 14
+        "quick_session_num_records": struct.unpack_from("<h", p, o + 12)[
+            0
+        ],  # offset 20
+        "quick_session_max_records": struct.unpack_from("<h", p, o + 14)[
+            0
+        ],  # offset 22
+        "quick_session_interval_s": struct.unpack_from("<I", p, o + 8)[0]
+        / 1000.0,  # offset 16
+        "shunt_setup_nom_capacity_ah": struct.unpack_from("<f", p, o + 18)[0]
+        / 1000.0,  # offset 26
     }
 
 
 def _parse_hw_system_setup_v4(p: bytes) -> dict:
-    """0x4A34/0x4A35 - HW System Setup v4/v5 (74/76 bytes, 30 s). Identity + quick session."""
+    """
+    0x4A34/0x4A35 - HW System Setup v4/v5 (74/76 bytes, 30 s).
+
+    Identity + quick session.
+    """
     o = OFFSET_PAYLOAD
-    sys_code = p[o + 2: o + 10].rstrip(b"\x00").decode("ascii", errors="replace")   # offset 10
-    sys_name = p[o + 10: o + 30].rstrip(b"\x00").decode("ascii", errors="replace")  # offset 18
-    asset_code = p[o + 30: o + 50].rstrip(b"\x00").decode("ascii", errors="replace")  # offset 38
+    sys_code = (
+        p[o + 2 : o + 10].rstrip(b"\x00").decode("ascii", errors="replace")
+    )  # offset 10
+    sys_name = (
+        p[o + 10 : o + 30].rstrip(b"\x00").decode("ascii", errors="replace")
+    )  # offset 18
+    asset_code = (
+        p[o + 30 : o + 50].rstrip(b"\x00").decode("ascii", errors="replace")
+    )  # offset 38
     return {
         "system_code": sys_code,
         "system_name": sys_name,
         "asset_code": asset_code,
-        "quick_session_enabled": bool(p[o + 51]),                                   # offset 59
-        "quick_session_interval_s": struct.unpack_from("<I", p, o + 52)[0] / 1000.0,  # offset 60
-        "firmware_version": struct.unpack_from("<h", p, o + 58)[0],                # offset 66
-        "hardware_version": struct.unpack_from("<h", p, o + 60)[0],                # offset 68
-        "serial_number": struct.unpack_from("<I", p, o + 62)[0],                   # offset 70
+        "quick_session_enabled": bool(p[o + 51]),  # offset 59
+        "quick_session_interval_s": struct.unpack_from("<I", p, o + 52)[0]
+        / 1000.0,  # offset 60
+        "firmware_version": struct.unpack_from("<h", p, o + 58)[0],  # offset 66
+        "hardware_version": struct.unpack_from("<h", p, o + 60)[0],  # offset 68
+        "serial_number": struct.unpack_from("<I", p, o + 62)[0],  # offset 70
     }
 
 
 def _parse_cellgroup_setup(p: bytes) -> dict:
-    """0x4B34/35/36 - HW Cell Group Setup (51/53/55 bytes, 30 s). Voltage/temp thresholds."""
+    """
+    0x4B34/35/36 - HW Cell Group Setup (51/53/55 bytes, 30 s).
+
+    Voltage/temp thresholds.
+    """
     o = OFFSET_PAYLOAD
     return {
-        "cell_setup_first_id": p[o + 2],                                           # offset 10
-        "cell_setup_last_id": p[o + 3],                                            # offset 11
-        "cell_setup_nom_cell_volt_mv": struct.unpack_from("<h", p, o + 4)[0],      # offset 12
-        "cell_setup_lo_cell_volt_mv": struct.unpack_from("<h", p, o + 6)[0],       # offset 14
-        "cell_setup_hi_cell_volt_mv": struct.unpack_from("<h", p, o + 8)[0],       # offset 16
-        "cell_setup_bypass_volt_mv": struct.unpack_from("<h", p, o + 10)[0],       # offset 18
-        "cell_setup_bypass_amp_limit_ma": struct.unpack_from("<h", p, o + 12)[0],  # offset 20
-        "cell_setup_bypass_temp_limit_c": _decode_temp(p[o + 14]),                 # offset 22
-        "cell_setup_lo_cell_temp_c": _decode_temp(p[o + 15]),                      # offset 23
-        "cell_setup_hi_cell_temp_c": _decode_temp(p[o + 16]),                      # offset 24
-        "cell_setup_nom_cells_in_series": p[o + 18],                               # offset 26
+        "cell_setup_first_id": p[o + 2],  # offset 10
+        "cell_setup_last_id": p[o + 3],  # offset 11
+        "cell_setup_nom_cell_volt_mv": struct.unpack_from("<h", p, o + 4)[
+            0
+        ],  # offset 12
+        "cell_setup_lo_cell_volt_mv": struct.unpack_from("<h", p, o + 6)[
+            0
+        ],  # offset 14
+        "cell_setup_hi_cell_volt_mv": struct.unpack_from("<h", p, o + 8)[
+            0
+        ],  # offset 16
+        "cell_setup_bypass_volt_mv": struct.unpack_from("<h", p, o + 10)[
+            0
+        ],  # offset 18
+        "cell_setup_bypass_amp_limit_ma": struct.unpack_from("<h", p, o + 12)[
+            0
+        ],  # offset 20
+        "cell_setup_bypass_temp_limit_c": _decode_temp(p[o + 14]),  # offset 22
+        "cell_setup_lo_cell_temp_c": _decode_temp(p[o + 15]),  # offset 23
+        "cell_setup_hi_cell_temp_c": _decode_temp(p[o + 16]),  # offset 24
+        "cell_setup_nom_cells_in_series": p[o + 18],  # offset 26
     }
 
 
 def _parse_shunt_setup(p: bytes) -> dict:
-    """0x4C33/4C34/4C58 - HW Shunt Setup (46–68 bytes, 30 s). Nominal capacity + config."""
+    """
+    0x4C33/4C34/4C58 - HW Shunt Setup (46-68 bytes, 30 s).
+
+    Nominal capacity + config.
+    """
     o = OFFSET_PAYLOAD
     return {
-        "shunt_setup_type": p[o + 0],                                              # offset 8
-        "shunt_setup_nom_capacity_ah": struct.unpack_from("<f", p, o + 16)[0],     # offset 24
-        "shunt_setup_reverse_flow": bool(p[o + 36]),                               # offset 44
+        "shunt_setup_type": p[o + 0],  # offset 8
+        "shunt_setup_nom_capacity_ah": struct.unpack_from("<f", p, o + 16)[
+            0
+        ],  # offset 24
+        "shunt_setup_reverse_flow": bool(p[o + 36]),  # offset 44
     }
 
 
@@ -1253,26 +1308,46 @@ def _parse_expansion_setup(p: bytes) -> dict:
     """0x4D33/4D34 - HW Expansion Setup (32 bytes, 30 s). Relay mode assignments."""
     o = OFFSET_PAYLOAD
     return {
-        "expansion_setup_template": p[o + 1],   # offset 9
-        "expansion_setup_relay1": p[o + 3],     # offset 11
-        "expansion_setup_relay2": p[o + 4],     # offset 12
-        "expansion_setup_relay3": p[o + 5],     # offset 13
-        "expansion_setup_relay4": p[o + 6],     # offset 14
+        "expansion_setup_template": p[o + 1],  # offset 9
+        "expansion_setup_relay1": p[o + 3],  # offset 11
+        "expansion_setup_relay2": p[o + 4],  # offset 12
+        "expansion_setup_relay3": p[o + 5],  # offset 13
+        "expansion_setup_relay4": p[o + 6],  # offset 14
     }
 
 
 def _parse_remote_setup(p: bytes) -> dict:
-    """0x4E58 - Control Remote Setup (45 bytes, 30 s). Charge/discharge target voltages."""
+    """
+    0x4E58 - Control Remote Setup (45 bytes, 30 s).
+
+    Charge/discharge target voltages.
+    """
     o = OFFSET_PAYLOAD
     return {
-        "remote_charge_target_norm_volt": struct.unpack_from("<h", p, o + 0)[0],   # offset 8
-        "remote_charge_target_norm_amp": struct.unpack_from("<h", p, o + 2)[0],    # offset 10
-        "remote_charge_target_limp_volt": struct.unpack_from("<h", p, o + 6)[0],   # offset 14
-        "remote_charge_target_limp_amp": struct.unpack_from("<h", p, o + 8)[0],    # offset 16
-        "remote_dischg_target_norm_volt": struct.unpack_from("<h", p, o + 18)[0],  # offset 26
-        "remote_dischg_target_norm_amp": struct.unpack_from("<h", p, o + 20)[0],   # offset 28
-        "remote_dischg_target_limp_volt": struct.unpack_from("<h", p, o + 24)[0],  # offset 32
-        "remote_dischg_target_limp_amp": struct.unpack_from("<h", p, o + 26)[0],   # offset 34
+        "remote_charge_target_norm_volt": struct.unpack_from("<h", p, o + 0)[
+            0
+        ],  # offset 8
+        "remote_charge_target_norm_amp": struct.unpack_from("<h", p, o + 2)[
+            0
+        ],  # offset 10
+        "remote_charge_target_limp_volt": struct.unpack_from("<h", p, o + 6)[
+            0
+        ],  # offset 14
+        "remote_charge_target_limp_amp": struct.unpack_from("<h", p, o + 8)[
+            0
+        ],  # offset 16
+        "remote_dischg_target_norm_volt": struct.unpack_from("<h", p, o + 18)[
+            0
+        ],  # offset 26
+        "remote_dischg_target_norm_amp": struct.unpack_from("<h", p, o + 20)[
+            0
+        ],  # offset 28
+        "remote_dischg_target_limp_volt": struct.unpack_from("<h", p, o + 24)[
+            0
+        ],  # offset 32
+        "remote_dischg_target_limp_amp": struct.unpack_from("<h", p, o + 26)[
+            0
+        ],  # offset 34
     }
 
 
@@ -1280,14 +1355,24 @@ def _parse_critical_setup(p: bytes) -> dict:
     """0x4F33 - Control Critical Setup (75 bytes, 30 s). Protection thresholds."""
     o = OFFSET_PAYLOAD
     return {
-        "critical_setup_cell_volt_lo_mv": struct.unpack_from("<h", p, o + 5)[0],      # offset 13
-        "critical_setup_cell_volt_hi_mv": struct.unpack_from("<h", p, o + 7)[0],      # offset 15
-        "critical_setup_cell_temp_lo_c": _decode_temp(p[o + 11]),                     # offset 19
-        "critical_setup_cell_temp_hi_c": _decode_temp(p[o + 12]),                     # offset 20
-        "critical_setup_supply_volt_lo_mv": struct.unpack_from("<h", p, o + 15)[0],   # offset 23
-        "critical_setup_supply_volt_hi_mv": struct.unpack_from("<h", p, o + 17)[0],   # offset 25
-        "critical_setup_shunt_peak_charge_a": struct.unpack_from("<h", p, o + 33)[0] / 100.0,  # offset 41
-        "critical_setup_shunt_peak_dischg_a": struct.unpack_from("<h", p, o + 38)[0] / 100.0,  # offset 46
+        "critical_setup_cell_volt_lo_mv": struct.unpack_from("<h", p, o + 5)[
+            0
+        ],  # offset 13
+        "critical_setup_cell_volt_hi_mv": struct.unpack_from("<h", p, o + 7)[
+            0
+        ],  # offset 15
+        "critical_setup_cell_temp_lo_c": _decode_temp(p[o + 11]),  # offset 19
+        "critical_setup_cell_temp_hi_c": _decode_temp(p[o + 12]),  # offset 20
+        "critical_setup_supply_volt_lo_mv": struct.unpack_from("<h", p, o + 15)[
+            0
+        ],  # offset 23
+        "critical_setup_supply_volt_hi_mv": struct.unpack_from("<h", p, o + 17)[
+            0
+        ],  # offset 25
+        "critical_setup_shunt_peak_charge_a": struct.unpack_from("<h", p, o + 33)[0]
+        / 100.0,  # offset 41
+        "critical_setup_shunt_peak_dischg_a": struct.unpack_from("<h", p, o + 38)[0]
+        / 100.0,  # offset 46
     }
 
 
@@ -1295,44 +1380,63 @@ def _parse_charge_setup(p: bytes) -> dict:
     """0x5033 - Control Charge Setup (60 bytes, 30 s). Charge control thresholds."""
     o = OFFSET_PAYLOAD
     return {
-        "charge_setup_cell_volt_hi_mv": struct.unpack_from("<h", p, o + 22)[0],      # offset 30
-        "charge_setup_cell_volt_resume_mv": struct.unpack_from("<h", p, o + 24)[0],  # offset 32
-        "charge_setup_shunt_soc_hi_pct": _decode_soc(p[o + 36]),                     # offset 44
-        "charge_setup_shunt_soc_resume_pct": _decode_soc(p[o + 37]),                 # offset 45
+        "charge_setup_cell_volt_hi_mv": struct.unpack_from("<h", p, o + 22)[
+            0
+        ],  # offset 30
+        "charge_setup_cell_volt_resume_mv": struct.unpack_from("<h", p, o + 24)[
+            0
+        ],  # offset 32
+        "charge_setup_shunt_soc_hi_pct": _decode_soc(p[o + 36]),  # offset 44
+        "charge_setup_shunt_soc_resume_pct": _decode_soc(p[o + 37]),  # offset 45
     }
 
 
 def _parse_discharge_setup(p: bytes) -> dict:
-    """0x5158 - Control Discharge Setup (49 bytes, 30 s). Discharge control thresholds."""
+    """
+    0x5158 - Control Discharge Setup (49 bytes, 30 s).
+
+    Discharge control thresholds.
+    """
     o = OFFSET_PAYLOAD
     return {
-        "discharge_setup_cell_volt_lo_mv": struct.unpack_from("<h", p, o + 16)[0],      # offset 24
-        "discharge_setup_cell_volt_resume_mv": struct.unpack_from("<h", p, o + 18)[0],  # offset 26
-        "discharge_setup_shunt_soc_lo_pct": _decode_soc(p[o + 30]),                     # offset 38
-        "discharge_setup_shunt_soc_resume_pct": _decode_soc(p[o + 31]),                 # offset 39
+        "discharge_setup_cell_volt_lo_mv": struct.unpack_from("<h", p, o + 16)[
+            0
+        ],  # offset 24
+        "discharge_setup_cell_volt_resume_mv": struct.unpack_from("<h", p, o + 18)[
+            0
+        ],  # offset 26
+        "discharge_setup_shunt_soc_lo_pct": _decode_soc(p[o + 30]),  # offset 38
+        "discharge_setup_shunt_soc_resume_pct": _decode_soc(p[o + 31]),  # offset 39
     }
 
 
 def _parse_thermal_setup(p: bytes) -> dict:
-    """0x5258 - Control Thermal Setup (36 bytes, 30 s). Heat/cool thresholds (older format)."""
+    """
+    0x5258 - Control Thermal Setup (36 bytes, 30 s).
+
+    Heat/cool thresholds (older format).
+    """
     o = OFFSET_PAYLOAD
     return {
-        "thermal_heat_mode": p[o + 0],                        # offset 8
-        "thermal_heat_monitor_cell_temp": bool(p[o + 1]),     # offset 9
-        "thermal_heat_monitor_ambient": bool(p[o + 2]),       # offset 10
+        "thermal_heat_mode": p[o + 0],  # offset 8
+        "thermal_heat_monitor_cell_temp": bool(p[o + 1]),  # offset 9
+        "thermal_heat_monitor_ambient": bool(p[o + 2]),  # offset 10
         "thermal_heat_lo_cell_temp_c": _decode_temp(p[o + 3]),  # offset 11
-        "thermal_heat_lo_ambient_c": _decode_temp(p[o + 4]),    # offset 12
-        "thermal_cool_mode": p[o + 13],                       # offset 21
-        "thermal_cool_monitor_cell_temp": bool(p[o + 14]),    # offset 22
-        "thermal_cool_monitor_ambient": bool(p[o + 15]),      # offset 23
-        "thermal_cool_monitor_bypass": bool(p[o + 16]),       # offset 24
+        "thermal_heat_lo_ambient_c": _decode_temp(p[o + 4]),  # offset 12
+        "thermal_cool_mode": p[o + 13],  # offset 21
+        "thermal_cool_monitor_cell_temp": bool(p[o + 14]),  # offset 22
+        "thermal_cool_monitor_ambient": bool(p[o + 15]),  # offset 23
+        "thermal_cool_monitor_bypass": bool(p[o + 16]),  # offset 24
         "thermal_cool_hi_cell_temp_c": _decode_temp(p[o + 17]),  # offset 25
-        "thermal_cool_hi_ambient_c": _decode_temp(p[o + 18]),    # offset 26
+        "thermal_cool_hi_ambient_c": _decode_temp(p[o + 18]),  # offset 26
     }
 
 
 def _parse_daily_session_hist(p: bytes) -> dict:
-    """0x5831 - Daily Session History record (60 bytes). One compressed daily record per packet.
+    """
+    0x5831 - Daily Session History record (60 bytes).
+
+    One compressed daily record per packet.
 
     Each packet carries a single historical entry identified by hist_session_id and
     hist_session_time.  Consecutive IDs are broadcast in sequence so the receiver
@@ -1340,27 +1444,35 @@ def _parse_daily_session_hist(p: bytes) -> dict:
     _decode_soc(); temperatures with _decode_temp().
     """
     o = OFFSET_PAYLOAD
-    session_id = struct.unpack_from("<h", p, o + 0)[0]           # offset 8
-    session_time = struct.unpack_from("<I", p, o + 2)[0]         # offset 10  (epoch)
-    critical_events = p[o + 6]                                    # offset 14
-    min_temp = _decode_temp(p[o + 8])                             # offset 16
-    max_temp = _decode_temp(p[o + 9])                             # offset 17
-    min_soc = _decode_soc(p[o + 10])                              # offset 18
-    max_soc = _decode_soc(p[o + 11])                              # offset 19
-    min_cell_v = struct.unpack_from("<h", p, o + 12)[0]           # offset 20  (mV)
-    max_cell_v = struct.unpack_from("<h", p, o + 14)[0]           # offset 22  (mV)
-    min_supply_v = struct.unpack_from("<h", p, o + 16)[0] * 10    # offset 24  (×10 → mV)
-    max_supply_v = struct.unpack_from("<h", p, o + 18)[0] * 10    # offset 26  (×10 → mV)
-    min_shunt_v = struct.unpack_from("<h", p, o + 20)[0] * 10     # offset 28  (×10 → mV)
-    max_shunt_v = struct.unpack_from("<h", p, o + 22)[0] * 10     # offset 30  (×10 → mV)
+    session_id = struct.unpack_from("<h", p, o + 0)[0]  # offset 8
+    session_time = struct.unpack_from("<I", p, o + 2)[0]  # offset 10  (epoch)
+    critical_events = p[o + 6]  # offset 14
+    min_temp = _decode_temp(p[o + 8])  # offset 16
+    max_temp = _decode_temp(p[o + 9])  # offset 17
+    min_soc = _decode_soc(p[o + 10])  # offset 18
+    max_soc = _decode_soc(p[o + 11])  # offset 19
+    min_cell_v = struct.unpack_from("<h", p, o + 12)[0]  # offset 20  (mV)
+    max_cell_v = struct.unpack_from("<h", p, o + 14)[0]  # offset 22  (mV)
+    min_supply_v = struct.unpack_from("<h", p, o + 16)[0] * 10  # offset 24  (x10 -> mV)
+    max_supply_v = struct.unpack_from("<h", p, o + 18)[0] * 10  # offset 26  (x10 -> mV)
+    min_shunt_v = struct.unpack_from("<h", p, o + 20)[0] * 10  # offset 28  (x10 -> mV)
+    max_shunt_v = struct.unpack_from("<h", p, o + 22)[0] * 10  # offset 30  (x10 -> mV)
     # 8 thermal-band hours (each raw÷10 = hours)
-    thermal_bands = [p[o + 24 + i] / 10.0 for i in range(8)]     # offsets 32-39
+    thermal_bands = [p[o + 24 + i] / 10.0 for i in range(8)]  # offsets 32-39
     # 8 SoC-band hours (each raw÷10 = hours)
-    soc_bands = [p[o + 32 + i] / 10.0 for i in range(8)]         # offsets 40-47
-    peak_charge_a = struct.unpack_from("<h", p, o + 40)[0] / 100.0   # offset 48 (÷100 → A)
-    peak_dischg_a = struct.unpack_from("<h", p, o + 42)[0] / 100.0   # offset 50 (÷100 → A)
-    cumul_charge_ah = struct.unpack_from("<h", p, o + 44)[0] / 10.0  # offset 52 (÷10 → Ah)
-    cumul_dischg_ah = struct.unpack_from("<h", p, o + 46)[0] / 10.0  # offset 54 (÷10 → Ah)
+    soc_bands = [p[o + 32 + i] / 10.0 for i in range(8)]  # offsets 40-47
+    peak_charge_a = (
+        struct.unpack_from("<h", p, o + 40)[0] / 100.0
+    )  # offset 48 (÷100 → A)
+    peak_dischg_a = (
+        struct.unpack_from("<h", p, o + 42)[0] / 100.0
+    )  # offset 50 (÷100 → A)
+    cumul_charge_ah = (
+        struct.unpack_from("<h", p, o + 44)[0] / 10.0
+    )  # offset 52 (÷10 → Ah)
+    cumul_dischg_ah = (
+        struct.unpack_from("<h", p, o + 46)[0] / 10.0
+    )  # offset 54 (÷10 → Ah)
 
     return {
         "hist_session_id": session_id,
@@ -1386,25 +1498,26 @@ def _parse_daily_session_hist(p: bytes) -> dict:
 
 
 def _parse_quick_session_hist(p: bytes) -> dict:
-    """0x6831 - Quick Session History record (32 bytes). One snapshot per packet.
+    """
+    0x6831 - Quick Session History record (32 bytes). One snapshot per packet.
 
     Each packet carries a single historical entry identified by hist_session_id and
     hist_session_time.  Cell voltages in mV (raw as-is); SoC in % (raw÷100);
-    shunt voltage raw÷100 → V (×10 for mV); shunt current raw÷1000 → A.
+    shunt voltage raw/100 -> V (x10 for mV); shunt current raw/1000 -> A.
     """
     o = OFFSET_PAYLOAD
-    session_id = struct.unpack_from("<h", p, o + 0)[0]          # offset 8
-    session_time = struct.unpack_from("<I", p, o + 2)[0]        # offset 10  (epoch)
-    system_op_state = p[o + 6]                                   # offset 14
-    control_logic = p[o + 7]                                     # offset 15
-    min_cell_v = struct.unpack_from("<h", p, o + 8)[0]           # offset 16  (mV)
-    max_cell_v = struct.unpack_from("<h", p, o + 10)[0]          # offset 18  (mV)
-    avg_cell_v = struct.unpack_from("<h", p, o + 12)[0]          # offset 20  (mV)
-    avg_cell_temp = _decode_temp(p[o + 14])                      # offset 22
-    soc_pct = struct.unpack_from("<h", p, o + 15)[0] / 100.0    # offset 23  (÷100 → %)
-    shunt_v = struct.unpack_from("<h", p, o + 17)[0] * 10        # offset 25  (×10 → mV)
-    shunt_a = struct.unpack_from("<f", p, o + 19)[0] / 1000.0   # offset 27  (÷1000 → A)
-    cells_in_bypass = p[o + 23]                                  # offset 31
+    session_id = struct.unpack_from("<h", p, o + 0)[0]  # offset 8
+    session_time = struct.unpack_from("<I", p, o + 2)[0]  # offset 10  (epoch)
+    system_op_state = p[o + 6]  # offset 14
+    control_logic = p[o + 7]  # offset 15
+    min_cell_v = struct.unpack_from("<h", p, o + 8)[0]  # offset 16  (mV)
+    max_cell_v = struct.unpack_from("<h", p, o + 10)[0]  # offset 18  (mV)
+    avg_cell_v = struct.unpack_from("<h", p, o + 12)[0]  # offset 20  (mV)
+    avg_cell_temp = _decode_temp(p[o + 14])  # offset 22
+    soc_pct = struct.unpack_from("<h", p, o + 15)[0] / 100.0  # offset 23  (÷100 → %)
+    shunt_v = struct.unpack_from("<h", p, o + 17)[0] * 10  # offset 25  (x10 -> mV)
+    shunt_a = struct.unpack_from("<f", p, o + 19)[0] / 1000.0  # offset 27  (÷1000 → A)
+    cells_in_bypass = p[o + 23]  # offset 31
 
     return {
         "hist_session_id": session_id,
@@ -1429,14 +1542,20 @@ def _parse_integration_setup(p: bytes) -> dict:
     """0x5334 - HW Integration Setup v4 (26 bytes, 30 s). Bus config without MQTT."""
     o = OFFSET_PAYLOAD
     return {
-        "integration_usb_broadcast_enabled": bool(p[o + 1]),                          # offset 9
-        "integration_wifi_broadcast_enabled": bool(p[o + 2]),                         # offset 10
-        "integration_wifi_broadcast_mode": p[o + 3],                                  # offset 11
-        "integration_canbus_broadcast_enabled": bool(p[o + 4]),                       # offset 12
-        "integration_canbus_mode": p[o + 5],                                          # offset 13
-        "integration_canbus_remote_addr": struct.unpack_from("<I", p, o + 6)[0],      # offset 14
-        "integration_canbus_base_addr": struct.unpack_from("<I", p, o + 10)[0],       # offset 18
-        "integration_canbus_group_addr": struct.unpack_from("<I", p, o + 14)[0],      # offset 22
+        "integration_usb_broadcast_enabled": bool(p[o + 1]),  # offset 9
+        "integration_wifi_broadcast_enabled": bool(p[o + 2]),  # offset 10
+        "integration_wifi_broadcast_mode": p[o + 3],  # offset 11
+        "integration_canbus_broadcast_enabled": bool(p[o + 4]),  # offset 12
+        "integration_canbus_mode": p[o + 5],  # offset 13
+        "integration_canbus_remote_addr": struct.unpack_from("<I", p, o + 6)[
+            0
+        ],  # offset 14
+        "integration_canbus_base_addr": struct.unpack_from("<I", p, o + 10)[
+            0
+        ],  # offset 18
+        "integration_canbus_group_addr": struct.unpack_from("<I", p, o + 14)[
+            0
+        ],  # offset 22
     }
 
 

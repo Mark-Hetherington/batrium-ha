@@ -32,7 +32,9 @@ MSG_LOGIC_CONTROL = 0x4732  # Freq C: 1.55s
 MSG_STATUS_CONTROL_LOGIC = 0x4733  # Freq C: ~2s, compact logic status
 MSG_REMOTE_STATUS = 0x4932  # Freq C: 1.55s
 MSG_STATUS_SLOW_V2 = 0x4032  # Freq D: 30 s, slow status v2 (setup versions + duration)
-MSG_STATUS_SLOW_V3 = 0x4033  # Freq D: 30 s, slow status v3 (session records + shunt info)
+MSG_STATUS_SLOW_V3 = (
+    0x4033  # Freq D: 30 s, slow status v3 (session records + shunt info)
+)
 MSG_TELEMETRY_SLOW = 0x405A  # Freq D: 22s
 MSG_SYSTEM_SETUP = 0x4A33  # Freq D: 22s
 MSG_HW_SYSTEM_SETUP_V4 = 0x4A34  # Freq D, HW system setup v4
@@ -58,8 +60,12 @@ MSG_DAILY_SESSION = 0x5457  # Freq D: 22s
 MSG_THERMAL_SETUP_FULL = 0x5233  # Freq D: 22 s, thermal control configuration
 MSG_DAILY_SESSION_FULL = 0x5432  # Freq D: 20 s, daily session with kWh
 MSG_SESSION_METRICS = 0x5431  # Freq D: 30 s, quick/daily session record metadata
-MSG_DAILY_SESSION_HIST = 0x5831  # Freq D: ~30 s, historical daily session record (ID-indexed)
-MSG_QUICK_SESSION_HIST = 0x6831  # Freq D: ~30 s, historical quick session record (ID-indexed)
+MSG_DAILY_SESSION_HIST = (
+    0x5831  # Freq D: ~30 s, historical daily session record (ID-indexed)
+)
+MSG_QUICK_SESSION_HIST = (
+    0x6831  # Freq D: ~30 s, historical quick session record (ID-indexed)
+)
 MSG_HW_SHUNT_METRIC = 0x7832  # Freq D: 30 s, shunt metrics v2 with SoC recal timestamps
 MSG_SHUNT_METRIC = 0x7857  # Freq D: 22s
 MSG_INTEGRATION_SETUP_FULL = 0x5335  # Freq D: 30 s, integration bus config

@@ -609,11 +609,11 @@ def test_network_setup_parses_real_packet():
 
 def test_network_setup_disabled_ntp():
     header = make_header(MSG_NETWORK_SETUP)
-    payload = bytearray(88)
+    payload = bytearray(95)
     payload[4] = 0  # ntp_enabled = False
     payload[6] = 60  # ntp_update_interval = 60
     payload[8:16] = b"UTC+0\x00\x00\x00"
-    payload[60:73] = b"time.google.com"
+    payload[61:76] = b"time.google.com"  # NTP server at payload offset 61
 
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
@@ -878,10 +878,10 @@ def test_session_metrics_parses_record_counts():
 def test_slow_v2_parses_duration_and_soc_flags():
     header = make_header(MSG_STATUS_SLOW_V2)
     payload = bytearray(58)
-    struct.pack_into("<h", payload, 20, 90)   # EstDurationToFullmins = 90
-    struct.pack_into("<h", payload, 22, 45)   # EstDurationToEmptymins = 45
+    struct.pack_into("<h", payload, 20, 90)  # EstDurationToFullmins = 90
+    struct.pack_into("<h", payload, 22, 45)  # EstDurationToEmptymins = 45
     struct.pack_into("<f", payload, 24, 12000.0)  # ShuntAcculmAvgCharge = 12 A
-    struct.pack_into("<f", payload, 28, 8000.0)   # ShuntAcculmAvgDischg = 8 A
+    struct.pack_into("<f", payload, 28, 8000.0)  # ShuntAcculmAvgDischg = 8 A
     payload[36] = 1  # hasShuntSocCountLo = True
     payload[37] = 0  # hasShuntSocCountHi = False
 
@@ -904,10 +904,10 @@ def test_slow_v2_parses_duration_and_soc_flags():
 def test_slow_v3_parses_session_records():
     header = make_header(MSG_STATUS_SLOW_V3)
     payload = bytearray(58)
-    struct.pack_into("<h", payload, 4, 30)   # DailySessNumOfRecords = 30
+    struct.pack_into("<h", payload, 4, 30)  # DailySessNumOfRecords = 30
     struct.pack_into("<h", payload, 6, 365)  # DailySessMaxNumOfRecords = 365
     struct.pack_into("<h", payload, 12, 96)  # QuickSessNumOfRecords = 96
-    struct.pack_into("<h", payload, 14, 288) # QuickSessMaxNumOfRecords = 288
+    struct.pack_into("<h", payload, 14, 288)  # QuickSessMaxNumOfRecords = 288
     struct.pack_into("<I", payload, 8, 300_000)  # QuickSessionInterval = 300 s
     struct.pack_into("<f", payload, 18, 200_000.0)  # NomCapacityToEmpty = 200 Ah
 
@@ -930,13 +930,15 @@ def test_slow_v3_parses_session_records():
 def test_hw_system_setup_v4_parses_identity():
     header = make_header(MSG_HW_SYSTEM_SETUP_V4)
     payload = bytearray(66)
-    payload[2:10] = b"BATT0001"                    # SystemCode at o+2
-    payload[10:30] = b"My Battery Pack\x00\x00\x00\x00\x00"  # SysName at o+10 (20 bytes)
-    payload[51] = 1                                 # AllowQuickSession
-    struct.pack_into("<I", payload, 52, 120_000)   # QuickSessionInterval = 120 s
-    struct.pack_into("<h", payload, 58, 220)        # FirmwareVersion
-    struct.pack_into("<h", payload, 60, 4)          # HardwareVersion
-    struct.pack_into("<I", payload, 62, 123456)     # SerialNo
+    payload[2:10] = b"BATT0001"  # SystemCode at o+2
+    payload[10:30] = (
+        b"My Battery Pack\x00\x00\x00\x00\x00"  # SysName at o+10 (20 bytes)
+    )
+    payload[51] = 1  # AllowQuickSession
+    struct.pack_into("<I", payload, 52, 120_000)  # QuickSessionInterval = 120 s
+    struct.pack_into("<h", payload, 58, 220)  # FirmwareVersion
+    struct.pack_into("<h", payload, 60, 4)  # HardwareVersion
+    struct.pack_into("<I", payload, 62, 123456)  # SerialNo
 
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
@@ -970,13 +972,13 @@ def test_hw_system_setup_v5_dispatches_to_same_parser():
 def test_cellgroup_setup_parses_voltage_thresholds():
     header = make_header(MSG_CELL_GROUP_SETUP_V6)
     payload = bytearray(47)
-    payload[2] = 1   # HwCellmonFirstID
+    payload[2] = 1  # HwCellmonFirstID
     payload[3] = 16  # HwCellmonLastID
-    struct.pack_into("<h", payload, 4, 3600)   # NomCellVolt = 3600 mV
-    struct.pack_into("<h", payload, 6, 2800)   # LoCellVolt = 2800 mV
-    struct.pack_into("<h", payload, 8, 4200)   # HiCellVolt = 4200 mV
+    struct.pack_into("<h", payload, 4, 3600)  # NomCellVolt = 3600 mV
+    struct.pack_into("<h", payload, 6, 2800)  # LoCellVolt = 2800 mV
+    struct.pack_into("<h", payload, 8, 4200)  # HiCellVolt = 4200 mV
     struct.pack_into("<h", payload, 10, 4150)  # BypassVoltLevel = 4150 mV
-    struct.pack_into("<h", payload, 12, 500)   # BypassAmpLimit = 500 mA
+    struct.pack_into("<h", payload, 12, 500)  # BypassAmpLimit = 500 mA
     payload[14] = 75  # BypassTempLimit = 75-40 = 35°C
     payload[15] = 20  # LoCellTemp = 20-40 = -20°C
     payload[16] = 85  # HiCellTemp = 85-40 = 45°C
@@ -1048,14 +1050,14 @@ def test_expansion_setup_parses_relay_modes():
 def test_remote_setup_parses_charge_discharge_targets():
     header = make_header(MSG_REMOTE_SETUP)
     payload = bytearray(37)
-    struct.pack_into("<h", payload, 0, 5600)   # ChargeTargetNormVolt
-    struct.pack_into("<h", payload, 2, 1000)   # ChargeTargetNormAmp
-    struct.pack_into("<h", payload, 6, 5400)   # ChargeTargetLimpVolt
-    struct.pack_into("<h", payload, 8, 200)    # ChargeTargetLimpAmp
+    struct.pack_into("<h", payload, 0, 5600)  # ChargeTargetNormVolt
+    struct.pack_into("<h", payload, 2, 1000)  # ChargeTargetNormAmp
+    struct.pack_into("<h", payload, 6, 5400)  # ChargeTargetLimpVolt
+    struct.pack_into("<h", payload, 8, 200)  # ChargeTargetLimpAmp
     struct.pack_into("<h", payload, 18, 4800)  # DischargeTargetNormVolt
-    struct.pack_into("<h", payload, 20, 800)   # DischargeTargetNormAmp
+    struct.pack_into("<h", payload, 20, 800)  # DischargeTargetNormAmp
     struct.pack_into("<h", payload, 24, 4600)  # DischargeTargetLimpVolt
-    struct.pack_into("<h", payload, 26, 100)   # DischargeTargetLimpAmp
+    struct.pack_into("<h", payload, 26, 100)  # DischargeTargetLimpAmp
 
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
@@ -1075,10 +1077,10 @@ def test_remote_setup_parses_charge_discharge_targets():
 def test_critical_setup_parses_protection_thresholds():
     header = make_header(MSG_CRITICAL_SETUP)
     payload = bytearray(67)
-    struct.pack_into("<h", payload, 5, 2700)   # CellVoltLo = 2700 mV
-    struct.pack_into("<h", payload, 7, 4250)   # CellVoltHi = 4250 mV
-    payload[11] = 20   # CellTempLo = 20-40 = -20°C
-    payload[12] = 85   # CellTempHi = 85-40 = 45°C
+    struct.pack_into("<h", payload, 5, 2700)  # CellVoltLo = 2700 mV
+    struct.pack_into("<h", payload, 7, 4250)  # CellVoltHi = 4250 mV
+    payload[11] = 20  # CellTempLo = 20-40 = -20°C
+    payload[12] = 85  # CellTempHi = 85-40 = 45°C
     struct.pack_into("<h", payload, 15, 4000)  # SupplyVoltLo = 4000 mV
     struct.pack_into("<h", payload, 17, 5800)  # SupplyVoltHi = 5800 mV
     struct.pack_into("<h", payload, 33, 5000)  # ShuntPeakCharge = 5000/100 = 50 A
@@ -1105,8 +1107,8 @@ def test_critical_setup_parses_protection_thresholds():
 def test_charge_setup_parses_limits():
     header = make_header(MSG_CHARGE_SETUP)
     payload = bytearray(52)
-    struct.pack_into("<h", payload, 22, 4200)   # CellVoltHi = 4200 mV
-    struct.pack_into("<h", payload, 24, 4150)   # CellVoltResume = 4150 mV
+    struct.pack_into("<h", payload, 22, 4200)  # CellVoltHi = 4200 mV
+    struct.pack_into("<h", payload, 24, 4150)  # CellVoltResume = 4150 mV
     payload[36] = 210  # ShuntSocHi: _decode_soc(210) = 100%
     payload[37] = 180  # ShuntSocResume: _decode_soc(180) = 85%
 
@@ -1129,8 +1131,8 @@ def test_discharge_setup_parses_limits():
     payload = bytearray(41)
     struct.pack_into("<h", payload, 16, 2800)  # CellVoltLo = 2800 mV
     struct.pack_into("<h", payload, 18, 2900)  # CellVoltResume = 2900 mV
-    payload[30] = 20   # ShuntSocLo: _decode_soc(20) = 5%
-    payload[31] = 30   # ShuntSocResume: _decode_soc(30) = 10%
+    payload[30] = 20  # ShuntSocLo: _decode_soc(20) = 5%
+    payload[31] = 30  # ShuntSocResume: _decode_soc(30) = 10%
 
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
@@ -1149,9 +1151,9 @@ def test_discharge_setup_parses_limits():
 def test_thermal_setup_parses_heat_cool_thresholds():
     header = make_header(MSG_THERMAL_SETUP)
     payload = bytearray(28)
-    payload[0] = 1   # ControlHeatMode = 1
-    payload[1] = 1   # MonitorLoCellTemp = True
-    payload[2] = 0   # MonitorLoAmbient = False
+    payload[0] = 1  # ControlHeatMode = 1
+    payload[1] = 1  # MonitorLoCellTemp = True
+    payload[2] = 0  # MonitorLoAmbient = False
     payload[3] = 25  # HeatLoCellTemp = 25-40 = -15°C
     payload[4] = 20  # HeatLoAmbient = 20-40 = -20°C
     payload[13] = 0  # ControlCoolMode = 0
@@ -1188,9 +1190,9 @@ def test_integration_setup_v4_parses_bus_config():
     payload[3] = 3  # WiFi broadcast mode
     payload[4] = 1  # CANbus broadcast enabled
     payload[5] = 5  # CANbus mode
-    struct.pack_into("<I", payload, 6, 0x18FF50E5)   # CANbus remote addr
-    struct.pack_into("<I", payload, 10, 0x300)        # CANbus base addr
-    struct.pack_into("<I", payload, 14, 0x400)        # CANbus group addr
+    struct.pack_into("<I", payload, 6, 0x18FF50E5)  # CANbus remote addr
+    struct.pack_into("<I", payload, 10, 0x300)  # CANbus base addr
+    struct.pack_into("<I", payload, 14, 0x400)  # CANbus group addr
 
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
@@ -1213,21 +1215,21 @@ def test_integration_setup_v4_parses_bus_config():
 def test_daily_session_hist_parses_identity_and_cell_stats():
     header = make_header(MSG_DAILY_SESSION_HIST)
     payload = bytearray(52)
-    struct.pack_into("<h", payload, 0, 42)           # SessionId = 42
+    struct.pack_into("<h", payload, 0, 42)  # SessionId = 42
     struct.pack_into("<I", payload, 2, 1_750_000_000)  # SessionTime (epoch)
-    payload[6] = 3                                   # CriticalEvents = 3
-    payload[8] = 55   # MinReportTemp = 55-40 = 15°C
-    payload[9] = 75   # MaxReportTemp = 75-40 = 35°C
+    payload[6] = 3  # CriticalEvents = 3
+    payload[8] = 55  # MinReportTemp = 55-40 = 15°C
+    payload[9] = 75  # MaxReportTemp = 75-40 = 35°C
     payload[10] = 130  # MinShuntSoc = 130*0.5-5 = 60%
     payload[11] = 180  # MaxShuntSoc = 180*0.5-5 = 85%
     struct.pack_into("<h", payload, 12, 3100)  # MinCellVolt = 3100 mV
     struct.pack_into("<h", payload, 14, 3700)  # MaxCellVolt = 3700 mV
-    struct.pack_into("<h", payload, 16, 480)   # MinSupplyVolt raw=480 → 4800 mV
-    struct.pack_into("<h", payload, 18, 530)   # MaxSupplyVolt raw=530 → 5300 mV
+    struct.pack_into("<h", payload, 16, 480)  # MinSupplyVolt raw=480 → 4800 mV
+    struct.pack_into("<h", payload, 18, 530)  # MaxSupplyVolt raw=530 → 5300 mV
     struct.pack_into("<h", payload, 40, 4500)  # ShuntPeakCharge = 4500/100 = 45 A
     struct.pack_into("<h", payload, 42, 3000)  # ShuntPeakDischg = 3000/100 = 30 A
-    struct.pack_into("<h", payload, 44, 500)   # CumulCharge = 500/10 = 50 Ah
-    struct.pack_into("<h", payload, 46, 480)   # CumulDischg = 480/10 = 48 Ah
+    struct.pack_into("<h", payload, 44, 500)  # CumulCharge = 500/10 = 50 Ah
+    struct.pack_into("<h", payload, 46, 480)  # CumulDischg = 480/10 = 48 Ah
 
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
@@ -1253,11 +1255,11 @@ def test_daily_session_hist_parses_band_hours():
     header = make_header(MSG_DAILY_SESSION_HIST)
     payload = bytearray(52)
     # Thermal bands at payload offsets 24-31 (packet offsets 32-39), raw÷10 = hours
-    payload[24] = 20   # band A = 2.0 h
-    payload[25] = 35   # band B = 3.5 h
-    payload[26] = 0    # band C = 0.0 h
+    payload[24] = 20  # band A = 2.0 h
+    payload[25] = 35  # band B = 3.5 h
+    payload[26] = 0  # band C = 0.0 h
     # SoC bands at payload offsets 32-39
-    payload[32] = 10   # SoC band A = 1.0 h
+    payload[32] = 10  # SoC band A = 1.0 h
     payload[39] = 240  # SoC band H = 24.0 h
 
     pkt = parse_packet(header + bytes(payload))
@@ -1277,18 +1279,18 @@ def test_daily_session_hist_parses_band_hours():
 def test_quick_session_hist_parses_snapshot():
     header = make_header(MSG_QUICK_SESSION_HIST)
     payload = bytearray(24)
-    struct.pack_into("<h", payload, 0, 100)          # SessionId = 100
+    struct.pack_into("<h", payload, 0, 100)  # SessionId = 100
     struct.pack_into("<I", payload, 2, 1_760_000_000)  # SessionTime (epoch)
-    payload[6] = 2   # SystemOpState = 2 (Charging)
-    payload[7] = 1   # ControlLogic = 1
-    struct.pack_into("<h", payload, 8, 3350)          # MinCellVolt = 3350 mV
-    struct.pack_into("<h", payload, 10, 3420)         # MaxCellVolt = 3420 mV
-    struct.pack_into("<h", payload, 12, 3385)         # AvgCellVolt = 3385 mV
+    payload[6] = 2  # SystemOpState = 2 (Charging)
+    payload[7] = 1  # ControlLogic = 1
+    struct.pack_into("<h", payload, 8, 3350)  # MinCellVolt = 3350 mV
+    struct.pack_into("<h", payload, 10, 3420)  # MaxCellVolt = 3420 mV
+    struct.pack_into("<h", payload, 12, 3385)  # AvgCellVolt = 3385 mV
     payload[14] = 65  # AvgCellTemp = 65-40 = 25°C
-    struct.pack_into("<h", payload, 15, 7500)         # SocHiRes = 7500/100 = 75.0%
-    struct.pack_into("<h", payload, 17, 500)          # ShuntVolt raw=500 → 5000 mV
-    struct.pack_into("<f", payload, 19, 10_000.0)     # ShuntAmp raw=10000 → 10 A
-    payload[23] = 2                                   # CellsInBypass = 2
+    struct.pack_into("<h", payload, 15, 7500)  # SocHiRes = 7500/100 = 75.0%
+    struct.pack_into("<h", payload, 17, 500)  # ShuntVolt raw=500 → 5000 mV
+    struct.pack_into("<f", payload, 19, 10_000.0)  # ShuntAmp raw=10000 → 10 A
+    payload[23] = 2  # CellsInBypass = 2
 
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
