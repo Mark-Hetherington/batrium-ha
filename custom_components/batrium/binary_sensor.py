@@ -96,6 +96,13 @@ BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
         device_class=BinarySensorDeviceClass.PROBLEM,
         icon="mdi:timer-alert",
     ),
+    # ── Network Setup (0x5A32) ────────────────────────────────────────
+    BatriumBinarySensorEntityDescription(
+        key="ntp_enabled",
+        state_key="ntp_enabled",
+        name="NTP Enabled",
+        icon="mdi:clock-check-outline",
+    ),
     # ── Integration Setup (0x5335) ────────────────────────────────────
     BatriumBinarySensorEntityDescription(
         key="integration_usb_broadcast_enabled",

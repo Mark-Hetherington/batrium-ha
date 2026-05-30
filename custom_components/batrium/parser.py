@@ -19,6 +19,7 @@ from .const import (
     MSG_CELL_STATS,
     MSG_COMMS_STATUS,
     MSG_COMMS_STATUS_FULL,
+    MSG_COMMS_STATUS_V1,
     MSG_DAILY_SESSION,
     MSG_DAILY_SESSION_FULL,
     MSG_HW_SYSTEM_SETUP_FULL,
@@ -30,6 +31,7 @@ from .const import (
     MSG_LEGACY_REMOTE,
     MSG_LIFE_METRIC,
     MSG_LIVE_DISPLAY,
+    MSG_NETWORK_SETUP,
     MSG_LOGIC_CONTROL,
     MSG_REMOTE_SETUP_FULL,
     MSG_REMOTE_STATUS,
@@ -716,6 +718,24 @@ def _parse_daily_session_full(p: bytes) -> dict:
     }
 
 
+def _parse_network_setup(p: bytes) -> dict:
+    """0x5A32 - Network/Time Setup (96 bytes, undocumented, reverse-engineered)."""
+    o = OFFSET_PAYLOAD
+    # Bytes 0-7: small config fields
+    ntp_enabled = bool(struct.unpack_from("<H", p, o + 4)[0])
+    ntp_interval = struct.unpack_from("<H", p, o + 6)[0]
+    # Bytes 8-57: POSIX timezone name (null-terminated, 50-byte buffer)
+    tz_name = p[o + 8 : o + 58].rstrip(b"\x00").decode("ascii", errors="replace")
+    # Bytes 58-87: NTP server hostname (null-terminated, 30-byte buffer)
+    ntp_server = p[o + 58 : o + 88].rstrip(b"\x00").decode("ascii", errors="replace")
+    return {
+        "ntp_enabled": ntp_enabled,
+        "ntp_update_interval": ntp_interval,
+        "ntp_timezone": tz_name,
+        "ntp_server": ntp_server,
+    }
+
+
 def _parse_integration_setup_full(p: bytes) -> dict:
     """0x5335 - HW Integration Setup (28 bytes, 30 s)."""
     o = OFFSET_PAYLOAD
@@ -939,11 +959,13 @@ _DISPATCH: dict[int, Any] = {
     MSG_HW_SYSTEM_SETUP_FULL: _parse_hw_system_setup_full,
     MSG_DAILY_SESSION: _parse_daily_session,
     MSG_DAILY_SESSION_FULL: _parse_daily_session_full,
+    MSG_NETWORK_SETUP: _parse_network_setup,
     MSG_INTEGRATION_SETUP_FULL: _parse_integration_setup_full,
     MSG_REMOTE_SETUP_FULL: _parse_remote_setup_full,
     MSG_THERMAL_SETUP_FULL: _parse_thermal_setup_full,
     MSG_SHUNT_METRIC: _parse_shunt_metric,
     MSG_COMMS_STATUS: _parse_comms_status,
+    MSG_COMMS_STATUS_V1: _parse_comms_status,
     MSG_COMMS_STATUS_FULL: _parse_comms_status_full,
     MSG_LIFE_METRIC: _parse_life_metric,
     MSG_CELL_FULL_INFO: _parse_cell_full_info,

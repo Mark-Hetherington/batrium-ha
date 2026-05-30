@@ -323,6 +323,26 @@ SYSTEM_SENSORS: tuple[BatriumSensorEntityDescription, ...] = (
         icon="mdi:battery-minus-outline",
         state_class=SensorStateClass.MEASUREMENT,
     ),
+    # ── Network Setup (0x5A32) ────────────────────────────────────────
+    BatriumSensorEntityDescription(
+        key="ntp_timezone",
+        state_key="ntp_timezone",
+        name="NTP Timezone",
+        icon="mdi:map-clock-outline",
+    ),
+    BatriumSensorEntityDescription(
+        key="ntp_server",
+        state_key="ntp_server",
+        name="NTP Server",
+        icon="mdi:server-network",
+    ),
+    BatriumSensorEntityDescription(
+        key="ntp_update_interval",
+        state_key="ntp_update_interval",
+        name="NTP Update Interval",
+        icon="mdi:timer-sync-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
     # ── Integration Setup (0x5335) ────────────────────────────────────
     BatriumSensorEntityDescription(
         key="integration_wifi_broadcast_mode",

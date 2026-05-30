@@ -12,6 +12,7 @@ from custom_components.batrium.const import (
     MSG_HW_SYSTEM_SETUP_FULL,
     MSG_INTEGRATION_SETUP_FULL,
     MSG_LIVE_DISPLAY,
+    MSG_NETWORK_SETUP,
     MSG_REMOTE_SETUP_FULL,
     MSG_SHUNT_STATUS,
     MSG_STATUS_CONTROL_LOGIC,
@@ -560,6 +561,45 @@ def test_integration_setup_full_parses_bus_config():
     assert pkt.data["integration_canbus_group_addr"] == 0x400
     assert pkt.data["integration_mqtt_broadcast_enabled"] is True
     assert pkt.data["integration_mqtt_broadcast_mode"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Network Setup (0x5A32) — layout reverse-engineered from a real packet
+# ---------------------------------------------------------------------------
+
+# Real packet captured from a live WatchMon (NZ timezone, pool.ntp.org).
+_RAW_5A32 = bytes.fromhex(
+    "3a325a2ccf1d897e02030000010020004453542d31310000000000000000"
+    "00000000000000000000000000000000000000000000000000000000000000"
+    "0000000000000000706f6f6c2e6e74702e6f72670000000000000000000000"
+    "0000000000000000000000"
+)
+
+
+def test_network_setup_parses_real_packet():
+    pkt = parse_packet(_RAW_5A32)
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_NETWORK_SETUP
+    assert pkt.data["ntp_enabled"] is True
+    assert pkt.data["ntp_update_interval"] == 32
+    assert pkt.data["ntp_timezone"] == "DST-11"
+    assert pkt.data["ntp_server"] == "pool.ntp.org"
+
+
+def test_network_setup_disabled_ntp():
+    header = make_header(MSG_NETWORK_SETUP)
+    payload = bytearray(88)
+    payload[4] = 0   # ntp_enabled = False
+    payload[6] = 60  # ntp_update_interval = 60
+    payload[8:16] = b"UTC+0\x00\x00\x00"
+    payload[60:73] = b"time.google.com"
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.data["ntp_enabled"] is False
+    assert pkt.data["ntp_update_interval"] == 60
+    assert pkt.data["ntp_timezone"] == "UTC+0"
+    assert pkt.data["ntp_server"] == "time.google.com"
 
 
 # ---------------------------------------------------------------------------
