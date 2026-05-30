@@ -1,12 +1,12 @@
 {
   "domain": "batrium",
   "name": "Batrium BMS",
+  "codeowners": ["@Mark-Hetherington"],
   "config_flow": true,
-  "documentation": "https://github.com/YOUR_GITHUB_USERNAME/batrium-ha",
-  "issue_tracker": "https://github.com/YOUR_GITHUB_USERNAME/batrium-ha/issues",
   "dependencies": [],
-  "codeowners": ["@YOUR_GITHUB_USERNAME"],
+  "documentation": "https://github.com/Mark-Hetherington/batrium-ha",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/Mark-Hetherington/batrium-ha/issues",
   "requirements": [],
-  "version": "1.0.0",
-  "iot_class": "local_push"
+  "version": "1.0.0"
 }
