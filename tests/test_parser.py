@@ -10,6 +10,7 @@ from custom_components.batrium.const import (
     MSG_COMMS_STATUS_FULL,
     MSG_DAILY_SESSION_FULL,
     MSG_HW_SYSTEM_SETUP_FULL,
+    MSG_INTEGRATION_SETUP_FULL,
     MSG_LIVE_DISPLAY,
     MSG_REMOTE_SETUP_FULL,
     MSG_SHUNT_STATUS,
@@ -525,6 +526,40 @@ def test_remote_setup_full_parses_targets_and_soc_thresholds():
     assert pkt.data["remote_charge_limp_soc_pct"] == pytest.approx(5.0)
     assert pkt.data["remote_dischg_ramp1_amp"] == 600
     assert pkt.data["remote_dischg_limp_soc_pct"] == pytest.approx(10.0)
+
+
+# ---------------------------------------------------------------------------
+# Integration Setup (0x5335)
+# ---------------------------------------------------------------------------
+
+
+def test_integration_setup_full_parses_bus_config():
+    header = make_header(MSG_INTEGRATION_SETUP_FULL)
+    payload = bytearray(20)
+    payload[1] = 1  # USB broadcast enabled
+    payload[2] = 1  # WiFi broadcast enabled
+    payload[3] = 3  # WiFi broadcast mode = 3 (Verbose)
+    payload[4] = 1  # CANbus broadcast enabled
+    payload[5] = 5  # CANbus mode = 5
+    struct.pack_into("<I", payload, 6, 0x18FF50E5)  # CANbus remote addr
+    struct.pack_into("<I", payload, 10, 0x300)  # CANbus base addr
+    struct.pack_into("<I", payload, 14, 0x400)  # CANbus group addr
+    payload[18] = 1  # MQTT broadcast enabled
+    payload[19] = 2  # MQTT broadcast mode = 2
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_INTEGRATION_SETUP_FULL
+    assert pkt.data["integration_usb_broadcast_enabled"] is True
+    assert pkt.data["integration_wifi_broadcast_enabled"] is True
+    assert pkt.data["integration_wifi_broadcast_mode"] == 3
+    assert pkt.data["integration_canbus_broadcast_enabled"] is True
+    assert pkt.data["integration_canbus_mode"] == 5
+    assert pkt.data["integration_canbus_remote_addr"] == 0x18FF50E5
+    assert pkt.data["integration_canbus_base_addr"] == 0x300
+    assert pkt.data["integration_canbus_group_addr"] == 0x400
+    assert pkt.data["integration_mqtt_broadcast_enabled"] is True
+    assert pkt.data["integration_mqtt_broadcast_mode"] == 2
 
 
 # ---------------------------------------------------------------------------

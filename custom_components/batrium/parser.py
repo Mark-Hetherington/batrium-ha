@@ -22,6 +22,7 @@ from .const import (
     MSG_DAILY_SESSION,
     MSG_DAILY_SESSION_FULL,
     MSG_HW_SYSTEM_SETUP_FULL,
+    MSG_INTEGRATION_SETUP_FULL,
     MSG_LEGACY_CELL_FULL,
     MSG_LEGACY_DISCO,
     MSG_LEGACY_FAST,
@@ -715,6 +716,23 @@ def _parse_daily_session_full(p: bytes) -> dict:
     }
 
 
+def _parse_integration_setup_full(p: bytes) -> dict:
+    """0x5335 - HW Integration Setup (28 bytes, 30 s)."""
+    o = OFFSET_PAYLOAD
+    return {
+        "integration_usb_broadcast_enabled": bool(p[o + 1]),
+        "integration_wifi_broadcast_enabled": bool(p[o + 2]),
+        "integration_wifi_broadcast_mode": p[o + 3],
+        "integration_canbus_broadcast_enabled": bool(p[o + 4]),
+        "integration_canbus_mode": p[o + 5],
+        "integration_canbus_remote_addr": struct.unpack_from("<I", p, o + 6)[0],
+        "integration_canbus_base_addr": struct.unpack_from("<I", p, o + 10)[0],
+        "integration_canbus_group_addr": struct.unpack_from("<I", p, o + 14)[0],
+        "integration_mqtt_broadcast_enabled": bool(p[o + 18]),
+        "integration_mqtt_broadcast_mode": p[o + 19],
+    }
+
+
 def _parse_remote_setup_full(p: bytes) -> dict:
     """0x4E33 - Control Remote Setup (66 bytes, 40 s)."""
     o = OFFSET_PAYLOAD
@@ -921,6 +939,7 @@ _DISPATCH: dict[int, Any] = {
     MSG_HW_SYSTEM_SETUP_FULL: _parse_hw_system_setup_full,
     MSG_DAILY_SESSION: _parse_daily_session,
     MSG_DAILY_SESSION_FULL: _parse_daily_session_full,
+    MSG_INTEGRATION_SETUP_FULL: _parse_integration_setup_full,
     MSG_REMOTE_SETUP_FULL: _parse_remote_setup_full,
     MSG_THERMAL_SETUP_FULL: _parse_thermal_setup_full,
     MSG_SHUNT_METRIC: _parse_shunt_metric,

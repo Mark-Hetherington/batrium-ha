@@ -96,6 +96,31 @@ BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
         device_class=BinarySensorDeviceClass.PROBLEM,
         icon="mdi:timer-alert",
     ),
+    # ── Integration Setup (0x5335) ────────────────────────────────────
+    BatriumBinarySensorEntityDescription(
+        key="integration_usb_broadcast_enabled",
+        state_key="integration_usb_broadcast_enabled",
+        name="USB Broadcast Enabled",
+        icon="mdi:usb",
+    ),
+    BatriumBinarySensorEntityDescription(
+        key="integration_wifi_broadcast_enabled",
+        state_key="integration_wifi_broadcast_enabled",
+        name="WiFi Broadcast Enabled",
+        icon="mdi:wifi",
+    ),
+    BatriumBinarySensorEntityDescription(
+        key="integration_canbus_broadcast_enabled",
+        state_key="integration_canbus_broadcast_enabled",
+        name="CAN Bus Broadcast Enabled",
+        icon="mdi:can",
+    ),
+    BatriumBinarySensorEntityDescription(
+        key="integration_mqtt_broadcast_enabled",
+        state_key="integration_mqtt_broadcast_enabled",
+        name="MQTT Broadcast Enabled",
+        icon="mdi:message-cog-outline",
+    ),
     # ── HW System Setup Full (0x4A36) ─────────────────────────────────
     BatriumBinarySensorEntityDescription(
         key="quick_session_enabled",

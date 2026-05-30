@@ -323,6 +323,46 @@ SYSTEM_SENSORS: tuple[BatriumSensorEntityDescription, ...] = (
         icon="mdi:battery-minus-outline",
         state_class=SensorStateClass.MEASUREMENT,
     ),
+    # ── Integration Setup (0x5335) ────────────────────────────────────
+    BatriumSensorEntityDescription(
+        key="integration_wifi_broadcast_mode",
+        state_key="integration_wifi_broadcast_mode",
+        name="WiFi Broadcast Mode",
+        icon="mdi:wifi-settings",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    BatriumSensorEntityDescription(
+        key="integration_canbus_mode",
+        state_key="integration_canbus_mode",
+        name="CAN Bus Mode",
+        icon="mdi:can",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    BatriumSensorEntityDescription(
+        key="integration_canbus_remote_addr",
+        state_key="integration_canbus_remote_addr",
+        name="CAN Bus Remote Address",
+        icon="mdi:can",
+    ),
+    BatriumSensorEntityDescription(
+        key="integration_canbus_base_addr",
+        state_key="integration_canbus_base_addr",
+        name="CAN Bus Base Address",
+        icon="mdi:can",
+    ),
+    BatriumSensorEntityDescription(
+        key="integration_canbus_group_addr",
+        state_key="integration_canbus_group_addr",
+        name="CAN Bus Group Address",
+        icon="mdi:can",
+    ),
+    BatriumSensorEntityDescription(
+        key="integration_mqtt_broadcast_mode",
+        state_key="integration_mqtt_broadcast_mode",
+        name="MQTT Broadcast Mode",
+        icon="mdi:message-cog-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
     # ── Remote Setup (0x4E33) ─────────────────────────────────────────
     BatriumSensorEntityDescription(
         key="remote_template_no",

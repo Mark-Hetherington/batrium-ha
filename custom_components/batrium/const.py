@@ -45,6 +45,7 @@ MSG_DAILY_SESSION = 0x5457  # Freq D: 22s
 MSG_THERMAL_SETUP_FULL = 0x5233  # Freq D: 22 s, thermal control configuration
 MSG_DAILY_SESSION_FULL = 0x5432  # Freq D: 20 s, daily session with kWh
 MSG_SHUNT_METRIC = 0x7857  # Freq D: 22s
+MSG_INTEGRATION_SETUP_FULL = 0x5335  # Freq D: 30 s, integration bus config
 MSG_LIFE_METRIC = 0x5632  # Freq D: 22s
 MSG_COMMS_STATUS = 0x6131  # Freq C: 2 s, comms link health
 MSG_COMMS_STATUS_FULL = 0x6133  # Freq B: 300 ms, detailed comms + WiFi RSSI
