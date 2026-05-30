@@ -96,6 +96,37 @@ BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
         device_class=BinarySensorDeviceClass.PROBLEM,
         icon="mdi:timer-alert",
     ),
+    # ── Thermal Setup (0x5233) — monitor-enable flags ─────────────────
+    BatriumBinarySensorEntityDescription(
+        key="thermal_heat_monitor_cell_temp",
+        state_key="thermal_heat_monitor_cell_temp",
+        name="Heat Monitors Cell Temp",
+        icon="mdi:thermometer-alert",
+    ),
+    BatriumBinarySensorEntityDescription(
+        key="thermal_heat_monitor_ambient",
+        state_key="thermal_heat_monitor_ambient",
+        name="Heat Monitors Ambient Temp",
+        icon="mdi:thermometer-alert",
+    ),
+    BatriumBinarySensorEntityDescription(
+        key="thermal_cool_monitor_cell_temp",
+        state_key="thermal_cool_monitor_cell_temp",
+        name="Cool Monitors Cell Temp",
+        icon="mdi:snowflake-thermometer",
+    ),
+    BatriumBinarySensorEntityDescription(
+        key="thermal_cool_monitor_ambient",
+        state_key="thermal_cool_monitor_ambient",
+        name="Cool Monitors Ambient Temp",
+        icon="mdi:snowflake-thermometer",
+    ),
+    BatriumBinarySensorEntityDescription(
+        key="thermal_cool_monitor_bypass",
+        state_key="thermal_cool_monitor_bypass",
+        name="Cool Monitors Bypass",
+        icon="mdi:electric-switch",
+    ),
 )
 
 # Expansion-board sensors — only created the first time a True value is observed,

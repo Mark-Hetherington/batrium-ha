@@ -40,6 +40,7 @@ MSG_DISCHARGE_SETUP = 0x5158  # Freq D: 22s
 MSG_THERMAL_SETUP = 0x5258  # Freq D: 22s
 MSG_INTEGRATION_SETUP = 0x5333  # Freq D: 22s
 MSG_DAILY_SESSION = 0x5457  # Freq D: 22s
+MSG_THERMAL_SETUP_FULL = 0x5233  # Freq D: 22 s, thermal control configuration
 MSG_DAILY_SESSION_FULL = 0x5432  # Freq D: 20 s, daily session with kWh
 MSG_SHUNT_METRIC = 0x7857  # Freq D: 22s
 MSG_LIFE_METRIC = 0x5632  # Freq D: 22s
@@ -137,6 +138,18 @@ SENSOR_DURATION_TO_EMPTY = "estimated_duration_to_empty_min"
 SENSOR_RECENT_CHARGE_MAH = "recent_charge_mah"
 SENSOR_RECENT_DISCHARGE_MAH = "recent_discharge_mah"
 SENSOR_RECENT_NETT_MAH = "recent_nett_mah"
+
+# --- Thermal Setup (0x5233) ---
+SENSOR_THERMAL_HEAT_MODE = "thermal_heat_mode"
+SENSOR_THERMAL_HEAT_LO_CELL_TEMP = "thermal_heat_lo_cell_temp_c"
+SENSOR_THERMAL_HEAT_LO_AMBIENT = "thermal_heat_lo_ambient_c"
+SENSOR_THERMAL_HEAT_LO_CELL_CUTOUT = "thermal_heat_lo_cell_cutout_c"
+SENSOR_THERMAL_HEAT_LO_AMBIENT_CUTOUT = "thermal_heat_lo_ambient_cutout_c"
+SENSOR_THERMAL_COOL_MODE = "thermal_cool_mode"
+SENSOR_THERMAL_COOL_HI_CELL_TEMP = "thermal_cool_hi_cell_temp_c"
+SENSOR_THERMAL_COOL_HI_AMBIENT = "thermal_cool_hi_ambient_c"
+SENSOR_THERMAL_COOL_HI_CELL_CUTOUT = "thermal_cool_hi_cell_cutout_c"
+SENSOR_THERMAL_COOL_HI_AMBIENT_CUTOUT = "thermal_cool_hi_ambient_cutout_c"
 
 # --- Live Display (0x3233) ---
 SENSOR_SHUNT_CUMUL_CHARGE_KWH = "shunt_cumul_charge_kwh"

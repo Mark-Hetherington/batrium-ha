@@ -15,6 +15,7 @@ from custom_components.batrium.const import (
     MSG_SYSTEM_DISCO,
     MSG_TELEMETRY_FAST,
     MSG_TELEMETRY_RAPID,
+    MSG_THERMAL_SETUP_FULL,
     UDP_START_HEADER,
 )
 from custom_components.batrium.parser import (
@@ -390,6 +391,50 @@ def test_comms_status_full_parses_rssi_and_cell_group():
     assert pkt.data["max_cell_voltage_mv"] == 3580
     assert pkt.data["min_cell_temp_c"] == pytest.approx(25.0)
     assert pkt.data["max_cell_temp_c"] == pytest.approx(30.0)
+
+
+# ---------------------------------------------------------------------------
+# Thermal Setup (0x5233)
+# ---------------------------------------------------------------------------
+
+
+def test_thermal_setup_full_parses_thresholds():
+    header = make_header(MSG_THERMAL_SETUP_FULL)
+    payload = bytearray(32)
+    payload[0] = 0  # ControlHeatMode = 0 (Auto)
+    payload[1] = 1  # ControlHeatMonitorLoCellTemp = True
+    payload[2] = 0  # ControlHeatMonitorLoAmbient = False
+    payload[3] = 20  # ControlHeatLoCellTemp = 20-40 = -20°C
+    payload[4] = 15  # ControlHeatLoAmbient = 15-40 = -25°C
+    payload[13] = 1  # ControlCoolMode = 1 (Manually On)
+    payload[14] = 1  # ControlCoolMonitorHiCellTemp = True
+    payload[15] = 1  # ControlCoolMonitorHiAmbient = True
+    payload[16] = 0  # ControlCoolMonitorInBypass = False
+    payload[17] = 85  # ControlCoolHiCellTemp = 85-40 = 45°C
+    payload[18] = 80  # ControlCoolHiAmbient = 80-40 = 40°C
+    payload[28] = 10  # ControlHeatLoCellCutout = 10-40 = -30°C
+    payload[29] = 5  # ControlHeatLoAmbientCutout = 5-40 = -35°C
+    payload[30] = 95  # ControlCoolHiCellCutout = 95-40 = 55°C
+    payload[31] = 90  # ControlCoolHiAmbientCutout = 90-40 = 50°C
+
+    pkt = parse_packet(header + bytes(payload))
+    assert pkt is not None
+    assert pkt.raw_msg_type == MSG_THERMAL_SETUP_FULL
+    assert pkt.data["thermal_heat_mode"] == 0
+    assert pkt.data["thermal_heat_monitor_cell_temp"] is True
+    assert pkt.data["thermal_heat_monitor_ambient"] is False
+    assert pkt.data["thermal_heat_lo_cell_temp_c"] == pytest.approx(-20.0)
+    assert pkt.data["thermal_heat_lo_ambient_c"] == pytest.approx(-25.0)
+    assert pkt.data["thermal_heat_lo_cell_cutout_c"] == pytest.approx(-30.0)
+    assert pkt.data["thermal_heat_lo_ambient_cutout_c"] == pytest.approx(-35.0)
+    assert pkt.data["thermal_cool_mode"] == 1
+    assert pkt.data["thermal_cool_monitor_cell_temp"] is True
+    assert pkt.data["thermal_cool_monitor_ambient"] is True
+    assert pkt.data["thermal_cool_monitor_bypass"] is False
+    assert pkt.data["thermal_cool_hi_cell_temp_c"] == pytest.approx(45.0)
+    assert pkt.data["thermal_cool_hi_ambient_c"] == pytest.approx(40.0)
+    assert pkt.data["thermal_cool_hi_cell_cutout_c"] == pytest.approx(55.0)
+    assert pkt.data["thermal_cool_hi_ambient_cutout_c"] == pytest.approx(50.0)
 
 
 # ---------------------------------------------------------------------------

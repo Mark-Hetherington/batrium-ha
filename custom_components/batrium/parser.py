@@ -38,6 +38,7 @@ from .const import (
     MSG_TELEMETRY_FAST,
     MSG_TELEMETRY_RAPID,
     MSG_TELEMETRY_SLOW,
+    MSG_THERMAL_SETUP_FULL,
     OFFSET_MSG_TYPE,
     OFFSET_PAYLOAD,
     OFFSET_SYSTEM_ID,
@@ -687,6 +688,43 @@ def _parse_daily_session_full(p: bytes) -> dict:
     }
 
 
+def _parse_thermal_setup_full(p: bytes) -> dict:
+    """0x5233 - Control Thermal Setup (40 bytes, 22 s)."""
+    o = OFFSET_PAYLOAD
+    heat_mode = p[o + 0]
+    heat_monitor_cell = bool(p[o + 1])
+    heat_monitor_ambient = bool(p[o + 2])
+    heat_lo_cell = _decode_temp(p[o + 3])
+    heat_lo_ambient = _decode_temp(p[o + 4])
+    cool_mode = p[o + 13]
+    cool_monitor_cell = bool(p[o + 14])
+    cool_monitor_ambient = bool(p[o + 15])
+    cool_monitor_bypass = bool(p[o + 16])
+    cool_hi_cell = _decode_temp(p[o + 17])
+    cool_hi_ambient = _decode_temp(p[o + 18])
+    heat_lo_cell_cutout = _decode_temp(p[o + 28])
+    heat_lo_ambient_cutout = _decode_temp(p[o + 29])
+    cool_hi_cell_cutout = _decode_temp(p[o + 30])
+    cool_hi_ambient_cutout = _decode_temp(p[o + 31])
+    return {
+        "thermal_heat_mode": heat_mode,
+        "thermal_heat_lo_cell_temp_c": heat_lo_cell,
+        "thermal_heat_lo_ambient_c": heat_lo_ambient,
+        "thermal_heat_lo_cell_cutout_c": heat_lo_cell_cutout,
+        "thermal_heat_lo_ambient_cutout_c": heat_lo_ambient_cutout,
+        "thermal_heat_monitor_cell_temp": heat_monitor_cell,
+        "thermal_heat_monitor_ambient": heat_monitor_ambient,
+        "thermal_cool_mode": cool_mode,
+        "thermal_cool_hi_cell_temp_c": cool_hi_cell,
+        "thermal_cool_hi_ambient_c": cool_hi_ambient,
+        "thermal_cool_hi_cell_cutout_c": cool_hi_cell_cutout,
+        "thermal_cool_hi_ambient_cutout_c": cool_hi_ambient_cutout,
+        "thermal_cool_monitor_cell_temp": cool_monitor_cell,
+        "thermal_cool_monitor_ambient": cool_monitor_ambient,
+        "thermal_cool_monitor_bypass": cool_monitor_bypass,
+    }
+
+
 def _parse_comms_status(p: bytes) -> dict:
     """0x6131 - Status Comms (33 bytes, 2 s)."""
     o = OFFSET_PAYLOAD
@@ -808,6 +846,7 @@ _DISPATCH: dict[int, Any] = {
     MSG_SYSTEM_SETUP: _parse_system_setup,
     MSG_DAILY_SESSION: _parse_daily_session,
     MSG_DAILY_SESSION_FULL: _parse_daily_session_full,
+    MSG_THERMAL_SETUP_FULL: _parse_thermal_setup_full,
     MSG_SHUNT_METRIC: _parse_shunt_metric,
     MSG_COMMS_STATUS: _parse_comms_status,
     MSG_COMMS_STATUS_FULL: _parse_comms_status_full,
