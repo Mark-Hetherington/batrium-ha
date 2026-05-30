@@ -25,25 +25,31 @@ from .sensor import _build_device_info
 
 @dataclass
 class BatriumBinarySensorEntityDescription(BinarySensorEntityDescription):
-    """Extends the standard description with the coordinator state dict key."""
+    """Extends the standard description with coordinator state dict key and optional inversion."""
 
     state_key: str = ""
+    invert: bool = False
 
 
+# Always-created sensors — core system state present on every WatchMon.
 BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
+    # battery_ok_state is True when the battery IS OK, so invert for PROBLEM semantics.
     BatriumBinarySensorEntityDescription(
         key="battery_ok",
         state_key="battery_ok_state",
-        name="Battery OK",
-        device_class=BinarySensorDeviceClass.SAFETY,
-        icon="mdi:shield-check",
+        name="Battery Problem",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:shield-alert",
+        invert=True,
     ),
+    # critical_battery_ok is True when critical status IS OK, so invert for PROBLEM semantics.
     BatriumBinarySensorEntityDescription(
         key="critical_battery_ok",
         state_key="critical_battery_ok",
-        name="Critical Battery OK",
+        name="Critical Battery Problem",
         device_class=BinarySensorDeviceClass.PROBLEM,
         icon="mdi:alert-circle",
+        invert=True,
     ),
     BatriumBinarySensorEntityDescription(
         key="charging_is_on",
@@ -57,19 +63,6 @@ BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
         state_key="discharging_is_on",
         name="Discharging",
         icon="mdi:battery-minus",
-    ),
-    BatriumBinarySensorEntityDescription(
-        key="heat_on",
-        state_key="heat_on",
-        name="Heating",
-        device_class=BinarySensorDeviceClass.HEAT,
-        icon="mdi:thermometer-plus",
-    ),
-    BatriumBinarySensorEntityDescription(
-        key="cool_on",
-        state_key="cool_on",
-        name="Cooling",
-        icon="mdi:snowflake",
     ),
     BatriumBinarySensorEntityDescription(
         key="thermal_heat_on",
@@ -103,6 +96,11 @@ BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
         device_class=BinarySensorDeviceClass.PROBLEM,
         icon="mdi:timer-alert",
     ),
+)
+
+# Expansion-board sensors — only created the first time a True value is observed,
+# so systems without expansion hardware never get these entities.
+EXPANSION_BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
     BatriumBinarySensorEntityDescription(
         key="expansion_relay1",
         state_key="expansion_relay1",
@@ -149,9 +147,29 @@ async def async_setup_entry(
 ) -> None:
     """Set up Batrium binary sensors."""
     coordinator: BatriumCoordinator = hass.data[DOMAIN][entry.entry_id]
+
     async_add_entities(
         BatriumBinarySensor(coordinator, description, entry)
         for description in BINARY_SENSORS
+    )
+
+    expansion_entities_added: set[str] = set()
+
+    @callback
+    def _handle_expansion_check() -> None:
+        new_entities = []
+        for description in EXPANSION_BINARY_SENSORS:
+            if description.key not in expansion_entities_added:
+                if coordinator.state.get(description.state_key):
+                    expansion_entities_added.add(description.key)
+                    new_entities.append(
+                        BatriumBinarySensor(coordinator, description, entry)
+                    )
+        if new_entities:
+            async_add_entities(new_entities)
+
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, SIGNAL_BATRIUM_UPDATE, _handle_expansion_check)
     )
 
 
@@ -180,16 +198,20 @@ class BatriumBinarySensor(BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True when the coordinator has received recent data."""
-        return self._coordinator.available
+        """Return True when the coordinator is live and this key has been populated."""
+        return (
+            self._coordinator.available
+            and self.entity_description.state_key in self._coordinator.state
+        )
 
     @property
     def is_on(self) -> bool | None:
-        """Return the boolean state, or None if not yet received."""
+        """Return the boolean state, optionally inverted, or None if not yet received."""
         val = self._coordinator.state.get(self.entity_description.state_key)
         if val is None:
             return None
-        return bool(val)
+        result = bool(val)
+        return not result if self.entity_description.invert else result
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to coordinator update signals."""

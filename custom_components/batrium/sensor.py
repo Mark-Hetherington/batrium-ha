@@ -351,8 +351,11 @@ class BatriumSensor(SensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True when the coordinator has received recent data."""
-        return self._coordinator.available
+        """Return True when the coordinator is live and this key has been populated."""
+        return (
+            self._coordinator.available
+            and self.entity_description.state_key in self._coordinator.state
+        )
 
     @property
     def native_value(self) -> Any:
