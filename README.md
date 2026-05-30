@@ -86,3 +86,5 @@ https://wiki.batrium.com/canbus/watchmon-wifi-udp-protocol-v0.5.pdf
 ## Acknowledgements
 
 This integration was built using the [integration_blueprint](https://github.com/ludeeus/integration_blueprint) template by [@ludeeus](https://github.com/ludeeus) as a structural reference.
+
+The protocol implementation was informed by the official [WatchMonUdpListener](https://github.com/Batrium/WatchMonUdpListener) reference implementation by Batrium.
