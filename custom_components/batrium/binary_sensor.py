@@ -98,8 +98,10 @@ BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
     ),
 )
 
-# Expansion-board sensors — only created the first time a True value is observed,
-# so systems without expansion hardware never get these entities.
+# Expansion-board sensors — only created the first time a value is observed
+# (key present in coordinator.state, not truthiness - a relay legitimately
+# reporting False is still a real observation), so systems without expansion
+# hardware never get these entities.
 EXPANSION_BINARY_SENSORS: tuple[BatriumBinarySensorEntityDescription, ...] = (
     BatriumBinarySensorEntityDescription(
         key="expansion_relay1",
@@ -161,7 +163,7 @@ async def async_setup_entry(
         for description in EXPANSION_BINARY_SENSORS:
             if (
                 description.key not in expansion_entities_added
-                and coordinator.state.get(description.state_key)
+                and description.state_key in coordinator.state
             ):
                 expansion_entities_added.add(description.key)
                 new_entities.append(
