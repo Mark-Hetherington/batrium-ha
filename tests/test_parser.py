@@ -165,7 +165,7 @@ def test_fast_parses_soc():
 
     pkt = parse_packet(header + bytes(payload))
     assert pkt is not None
-    assert pkt.data["shunt_state_of_charge_pct"] == pytest.approx(60.0)
+    assert pkt.data["status_soc_pct"] == pytest.approx(60.0)
 
 
 def test_fast_parses_system_status_text():

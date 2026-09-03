@@ -21,6 +21,7 @@ from .const import (
     MSG_CELL_GROUP_SETUP_V6,
     MSG_CELL_STATS,
     MSG_CHARGE_SETUP,
+    MSG_CHARGE_SETUP_V4,
     MSG_COMMS_STATUS,
     MSG_COMMS_STATUS_FULL,
     MSG_COMMS_STATUS_V1,
@@ -279,7 +280,12 @@ def _parse_fast(p: bytes) -> dict:
         "system_supply_voltage_mv": sys_supply_v,
         "system_ambient_temp_c": sys_ambient_t,
         "system_device_time": sys_device_time,
-        "shunt_state_of_charge_pct": shunt_soc,
+        # Coarse (0.5%-step) SoC estimate - kept distinct from
+        # shunt_state_of_charge_pct so it doesn't clobber the finer-grained
+        # value from _parse_shunt_status/_parse_live_display (both ~raw/100
+        # precision), which was causing the displayed SoC to visibly flicker
+        # between 1 and 2 decimal places as messages interleaved.
+        "status_soc_pct": shunt_soc,
         "shunt_temp_c": shunt_celsius,
         "shunt_capacity_to_full_mah": shunt_cap_full,
         "shunt_capacity_to_empty_mah": shunt_cap_empty,
@@ -341,7 +347,9 @@ def _parse_disco(p: bytes) -> dict:
         "avg_cell_voltage_mv": avg_cell_v,
         "min_cell_temp_c": min_cell_t,
         "num_active_cellmons": num_active,
-        "shunt_state_of_charge_pct": shunt_soc,
+        # See _parse_fast for why this is kept distinct from
+        # shunt_state_of_charge_pct.
+        "status_soc_pct": shunt_soc,
         "shunt_voltage_raw": shunt_v,
         "shunt_current_ma": shunt_a,
         "shunt_status": shunt_status,
@@ -1596,6 +1604,7 @@ _DISPATCH: dict[int, Any] = {
     MSG_REMOTE_SETUP: _parse_remote_setup,
     MSG_CRITICAL_SETUP: _parse_critical_setup,
     MSG_CHARGE_SETUP: _parse_charge_setup,
+    MSG_CHARGE_SETUP_V4: _parse_charge_setup,
     MSG_DISCHARGE_SETUP: _parse_discharge_setup,
     MSG_THERMAL_SETUP: _parse_thermal_setup,
     MSG_INTEGRATION_SETUP_V4: _parse_integration_setup,

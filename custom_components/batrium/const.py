@@ -52,6 +52,10 @@ MSG_EXPANSION_SETUP = 0x4D58  # Freq D: 22s (no upstream payload, kept for refer
 MSG_REMOTE_SETUP = 0x4E58  # Freq D: 22s
 MSG_CRITICAL_SETUP = 0x4F33  # Freq D, critical protection setup
 MSG_CHARGE_SETUP = 0x5033  # Freq D: 22s
+MSG_CHARGE_SETUP_V4 = 0x5034  # Freq D: ~40s, charge setup v4 (72 bytes; same
+# field layout/offsets as 0x5033 for cell_volt_hi/resume + shunt_soc_hi/resume,
+# just extended with extra trailing fields - verified against real Batrium app
+# values 2026-09-03, reuses _parse_charge_setup unchanged.
 MSG_DISCHARGE_SETUP = 0x5158  # Freq D: 22s
 MSG_THERMAL_SETUP = 0x5258  # Freq D: 22s
 MSG_INTEGRATION_SETUP = 0x5333  # Freq D: 22s (no upstream payload, kept for reference)
