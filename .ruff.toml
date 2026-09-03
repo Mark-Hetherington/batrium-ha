@@ -13,6 +13,10 @@ ignore = [
     "D212", # multi-line-summary-first-line (incompatible with formatter)
     "COM812", # incompatible with formatter
     "ISC001", # incompatible with formatter
+    "CPY001", # Missing copyright notice - home-assistant/core doesn't select
+              # this rule either (not in its curated select list), we just
+              # have to say so explicitly since we select "ALL" rather than
+              # their curated list
 ]
 
 [lint.per-file-ignores]
